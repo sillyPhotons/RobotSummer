@@ -12,6 +12,7 @@
 #define REFLECTANCE PB1
 #define LED_DISPLAY PB12
 #define SERVO1 PB0
+#define IR PA7
 
 // Left motor
 #define L_FORWARD PB_8
@@ -30,8 +31,6 @@ const int SETPOINT = 250;
 const int GAIN = 5;
 int last_error = 0;
 
-void print_to_display(int intensity, int pg, int dg, int error, int speed, double dist);
-
 class Motor
 {
 public:
@@ -41,7 +40,7 @@ public:
         @params speed
     */
     void run_motor(int speed)
-    {   
+    {
         if (speed > 0)
         {
             speed = map(speed, 0, 100, 780, 1023);
@@ -49,7 +48,7 @@ public:
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
         }
         else if (speed < 0)
-        {   
+        {
             speed = map(speed, -100, 0, -1023, -780);
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, speed * -1, RESOLUTION_10B_COMPARE_FORMAT);
             pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
@@ -64,4 +63,18 @@ public:
 private:
     PinName forward_pin = PC_13;
     PinName reverse_pin = PC_13;
+};
+
+class Phototransistor
+{
+public:
+    Phototransistor(int photo_pin) : photo_pin(photo_pin){};
+    
+    int get_pin()
+    {
+        return photo_pin;
+    }
+
+private:
+    int photo_pin = 0;
 };
