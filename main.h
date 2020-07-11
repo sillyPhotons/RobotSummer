@@ -1,22 +1,21 @@
 // Timing variables
+const int start_time = HAL_GetTick();
+const int TAPE_TIME = 5400;
 const int TOTAL_TIME = 60000;
-int HOMING_TIME = 10000;
+const int HOMING_TIME = 10000;
 
 // PID Control variables
-const int SETPOINT = 250;
+int SETPOINT = 250;
 const int GAIN = 5;
-int last_error = 0;
+int prevError = 0;
+const int LINE_FOLLOW_SPEED = 20;
+int max_adjustment_speed = LINE_FOLLOW_SPEED + 10;
+float P, D, error = 0;
+int Lspeed = LINE_FOLLOW_SPEED;
+int Rspeed = LINE_FOLLOW_SPEED;
 
-class Arm
-{
-public:
-    Arm(PinName arm_servo): pin(arm_servo){};
-    void up_to_down(){
-        pwm_start(PA_6, 50, 1000, MICROSEC_COMPARE_FORMAT);
-    }
-private:
-    PinName pin;
-};
+bool dumped = false;
+
 class Motor
 {
 public:
@@ -32,7 +31,7 @@ public:
             speed = map(speed, 0, 100, 780, 1023);
             pwm_start(forward_pin, PWM_FREQUENCY * 5, speed, RESOLUTION_10B_COMPARE_FORMAT);
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
-        } 
+        }
         else if (speed < 0)
         {
             speed = map(speed, -100, 0, -1023, -780);
@@ -49,24 +48,4 @@ public:
 private:
     PinName forward_pin = PC_13;
     PinName reverse_pin = PC_13;
-};
-
-class Phototransistor
-{
-public:
-
-    Phototransistor(int photo_pin, double target_frequency) : photo_pin(photo_pin), target_frequency(target_frequency)
-    {
-        
-        ;
-    };
-
-    int get_pin()
-    {
-        return photo_pin;
-    }
-
-private:
-    int photo_pin = 0;
-    double target_frequency;
 };
