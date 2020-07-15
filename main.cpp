@@ -4,6 +4,11 @@
 #include "main.h"
 #include <vector>
 #include <numeric>
+// #include "stm32f10x.h"
+// #include <stm32f1xx_hal_adc.h>
+// #include <stm32f1xx_hal.h>
+// #include <stm32f1xx_hal_gpio.h>
+// #include <stm32f1xx.h>
 
 #define LED_DISPLAY PB12
 
@@ -32,6 +37,9 @@
 #define MAX_DISTANCE 50
 #define TARGET_DISTANCE 30
 
+#define TRIG2 PB12
+#define ECHO2 PB13
+
 // Left motor
 #define MOTOR_LF PB_8
 #define MOTOR_LB PB_9
@@ -40,9 +48,13 @@
 #define MOTOR_RF PA_1
 #define MOTOR_RB PA_0
 
+#define ADC1_DR_Address ((uint32_t)0x4001244C)
+
 Motor left_motor = Motor(MOTOR_LF, MOTOR_LB);
 Motor right_motor = Motor(MOTOR_RF, MOTOR_RB);
 NewPing sonar(TRIG, ECHO, 200);
+NewPing sonar2(TRIG2, ECHO2, 200);
+
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
 void run2_for_ms(Motor motor1, Motor motor2, int speed1, int speed2, int ms);
@@ -53,8 +65,21 @@ void PID(float L, float R);
 void checkLine();
 void pick_up_can();
 void dump();
+// void half_turn();
+// void ConfigureADC();
+
+ADC_HandleTypeDef g_AdcHandle;
+/*
+    Only Cans within max_distance will be detected
+    - May change with every loop iteration
+*/
+int max_distance = MAX_DISTANCE;
+int l_or_r = 1;
+
 void setup()
 {
+    Serial1.begin(115200);
+
     delay(100);
     pinMode(LED_DISPLAY, INPUT_PULLUP);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -66,6 +91,8 @@ void setup()
 
     pinMode(TRIG, OUTPUT);
     pinMode(ECHO, INPUT);
+    pinMode(TRIG2, OUTPUT);
+    pinMode(ECHO2, INPUT);
     pinMode(R_SENSOR, INPUT);
     pinMode(L_SENSOR, INPUT);
     pinMode(MOTOR_RF, OUTPUT);
@@ -76,12 +103,46 @@ void setup()
     pwm_start(BIN_SERVO, 50, BIN_REST, MICROSEC_COMPARE_FORMAT);
     pwm_stop(BIN_SERVO);
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_stop(ARM_SERVO);
+    // HAL_Init();
+    // ConfigureADC();
 }
 
-/*
-    Searches within the search radius for any objects
-    @param search_radius: centimeters 
-*/
+void ConfigureADC()
+{
+
+    g_AdcHandle.Instance = ADC1;
+    g_AdcHandle.Init.ScanConvMode = ADC_SCAN_ENABLE;
+    g_AdcHandle.Init.ContinuousConvMode = ENABLE;
+    g_AdcHandle.Init.DiscontinuousConvMode = DISABLE;
+    g_AdcHandle.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+    g_AdcHandle.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+    g_AdcHandle.Init.NbrOfConversion = 1;
+    HAL_ADC_Init(&g_AdcHandle);
+
+    ADC_ChannelConfTypeDef IRConfig;
+    IRConfig.Channel = ADC_CHANNEL_7;
+    IRConfig.Rank = ADC_REGULAR_RANK_1;
+    IRConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+
+    // ADC_ChannelConfTypeDef RConfig;
+    // IRConfig.Channel = ADC_CHANNEL_9;
+    // IRConfig.Rank = ADC_REGULAR_RANK_2;
+    // IRConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+
+    // ADC_ChannelConfTypeDef LConfig;
+    // IRConfig.Channel = ADC_CHANNEL_8;
+    // IRConfig.Rank = ADC_REGULAR_RANK_2;
+    // IRConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+
+    HAL_ADC_ConfigChannel(&g_AdcHandle, &IRConfig);
+}
+
+/**
+  * Searches within the search radius for any objects
+  * @param search_radius: centimeters 
+  */
 bool search(int search_radius)
 {
     int t = HAL_GetTick();
@@ -91,13 +152,22 @@ bool search(int search_radius)
     // This function will last for 4 seconds
     while (HAL_GetTick() - t < 3500)
     {
-        int cm = sonar.ping_cm(); // take distance measurement
-        int error = cm - TARGET_DISTANCE;
+        int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
+        int cm = sonar.ping_cm();   // take distance measurement
+        
+        Serial1.print("Top: ");
+        Serial1.println(cm2);
+        Serial1.print("Bottom: ");
+        Serial1.println(cm);
+        // display.display();
 
+        int error = cm - TARGET_DISTANCE;
         // object is within search radius
         // error will equal -1*TARGET_DISTANCE if the object is out of range
-        if (cm < search_radius && error != -1.0 * TARGET_DISTANCE)
+        if (cm < search_radius && error != -1.0 * TARGET_DISTANCE && cm2 > cm*3 && cm2 > 40)
         {
+
+            Serial1.println("FOUND!");
             found = true;
 
             if (error > 0)
@@ -177,6 +247,14 @@ void run2_for_ms(Motor motor1, Motor motor2, int speed1, int speed2, int ms)
     int current_tick = HAL_GetTick();
     while (HAL_GetTick() - current_tick < ms)
     {
+        // if (speed1 > 0 && speed2 > 0)
+        // {
+        //     int cm2 = sonar2.ping_cm();
+        //     if (cm2 <= TARGET_DISTANCE && cm2 != 0)
+        //     {
+        //         break;
+        //     }
+        // }
         motor1.run_motor(speed1);
         motor2.run_motor(speed2);
     }
@@ -195,8 +273,17 @@ void run2_for_ms(Motor motor1, Motor motor2, int speed1, int speed2, int ms)
 void run1_for_ms(Motor motor, int speed, int ms)
 {
     int current_tick = HAL_GetTick();
+
     while (HAL_GetTick() - current_tick < ms)
-    {
+    {   
+        // if (speed > 0)
+        // {
+        //     int cm2 = sonar2.ping_cm();
+        //     if (cm2 <= TARGET_DISTANCE && cm2 != 0)
+        //     {
+        //         break;
+        //     }
+        // }
         motor.run_motor(speed);
     }
     motor.run_motor(0);
@@ -210,17 +297,19 @@ void run1_for_ms(Motor motor, int speed, int ms)
 float detect_1KHz(int num_samples)
 {
     float raw[num_samples] = {0};
-
     int start = HAL_GetTick();
+    HAL_ADC_Start(&g_AdcHandle);
     for (int i = 0; i < num_samples; i += 1)
     {
-        raw[i] = analogRead(PA7);
-        delay(1); // single sample every ~ 1 ms
+        if (HAL_ADC_PollForConversion(&g_AdcHandle, 100) == HAL_OK)
+        {
+            raw[i] = 3.3 * HAL_ADC_GetValue(&g_AdcHandle) / 4096.0;
+        }
     }
+    HAL_ADC_Stop(&g_AdcHandle);
     int ms_taken = HAL_GetTick() - start;
-    double sampling_period = ms_taken / (num_samples * 1000.0);
+    float sampling_period = ms_taken / (num_samples * 1000.0);
     int sampling_hz = num_samples / sampling_period; // in Hz
-
     float ref_freq = 1000.0;
 
     float cosine_ref[num_samples] = {0};
@@ -242,59 +331,54 @@ float detect_1KHz(int num_samples)
 /*
     TODO: Finish this function!!
 */
-void to_IR_BEACON(int threshold)
+void to_IR_BEACON()
 {
+    float L = 0;
+    float R = 0;
+    // analogRead(L_SENSOR);
+    // float R = analogRead(R_SENSOR);
+    // Serial1.println(L);
+    // Serial1.println(R);
 
-    int i = 1;
-    bool found_peak = false;
-    bool converged = false;
-    float prev_max = 0;
-
-    while (!found_peak)
+    if (L < SETPOINT && R < SETPOINT)
     {
-        run2_for_ms(left_motor, right_motor, i * 20, -1 * i * 20, 200);
-        float history = 0;
-        for (int i = 0; i < 10; i += 1)
-        {
-            history += detect_1KHz(50);
-        }
-        float average = history / 10;
+        float intensity = detect_1KHz(100);
         display.clearDisplay();
         display.setCursor(0, 0);
-        display.print(average);
+        display.println(intensity);
         display.display();
 
-        if (average < threshold)
+        if (intensity != 100.0)
         {
+            left_motor.run_motor(30);
+            right_motor.run_motor(30);
         }
         else
         {
-            found_peak = true;
-            prev_max = average;
-        }
-    }
-
-    while (!converged)
-    {
-        run2_for_ms(left_motor, right_motor, -49, -30, 200);
-
-        float history = 0;
-        for (int i = 0; i < 20; i += 1)
-        {
-            history += detect_1KHz(50);
-        }
-        float average = history / 10;
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.print(average);
-        display.display();
-
-        if (abs(average - prev_max) / ((average + prev_max) / 2.0) < 0.2 || average > prev_max)
-        {
-        }
-        else
-        {
-            return;
+            if (l_or_r == 1)
+            {
+                Serial1.println("Not found, turning right");
+                left_motor.run_motor(-40);
+                right_motor.run_motor(20);
+                intensity = detect_1KHz(100);
+                if (intensity == 100.0)
+                {
+                    l_or_r = -1;
+                    return;
+                }
+            }
+            else
+            {
+                Serial1.println("Not found, turning left");
+                left_motor.run_motor(20);
+                right_motor.run_motor(-20);
+                intensity = detect_1KHz(100);
+                if (intensity == 100.0)
+                {
+                    l_or_r = 1;
+                    return;
+                }
+            }
         }
     }
 }
@@ -320,6 +404,7 @@ void checkLine()
 
     if (L < SETPOINT && R < SETPOINT)
     {
+
         if (prevError > 0)
         {
             right_motor.run_motor(LINE_FOLLOW_SPEED);
@@ -400,23 +485,17 @@ void dump()
 }
 
 /*
-    Only Cans within max_distance will be detected
-    - May change with every loop iteration
-*/
-int max_distance = MAX_DISTANCE;
-
-/*
     Event loop
 */
 void loop()
 {
-
-    // Get time since start in ms
+    // checkLine();
+    // // Get time since start in ms
     int time_elapsed = HAL_GetTick() - start_time;
     // Fixed time to travel on tape
     if (time_elapsed < TAPE_TIME)
     {
-        checkLine(); // line following
+        run2_for_ms(left_motor, right_motor, 20, 20, TAPE_TIME);
     }
     // After tape start search
     else if (time_elapsed < TOTAL_TIME - HOMING_TIME)
@@ -428,6 +507,7 @@ void loop()
         }
         if (found)
         {
+            Serial1.println("Engaging!");
             max_distance = MAX_DISTANCE;
             // alignment correction
             run2_for_ms(left_motor, right_motor, -55, 35, 50);
@@ -436,16 +516,24 @@ void loop()
             run2_for_ms(left_motor, right_motor, -90, -90, 200);
             run2_for_ms(left_motor, right_motor, -100, -100, 500);
             delay(1000);
+            Serial1.println("Complete!");
         }
     }
-    else if (time_elapsed < TOTAL_TIME && !dumped)
+    else if (time_elapsed < TOTAL_TIME)
     {
+        checkLine();
         // Requires high current
-        dump();
+        // dump();
     }
 
-    // to_IR_BEACON(100);
+    // float intensity = detect_1KHz(100);
+    // Serial1.println(intensity);
+    // float L = analogRead(L_SENSOR);
+    // float R = analogRead(R_SENSOR);
+    // Serial1.println(L);
+    // Serial1.println(R);
 
+    // delay(1000);
     // run2_for_ms(right_motor, left_motor, 100, 100, 1000);
     // pwm_start(ARM_SERVO, 50, 2000, MICROSEC_COMPARE_FORMAT);
     // run2_for_ms(right_motor, left_motor, 50, 50, 500);

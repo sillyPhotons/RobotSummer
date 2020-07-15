@@ -1,14 +1,14 @@
 // Timing variables
 const int start_time = HAL_GetTick();
-const int TAPE_TIME = 5400;
+const int TAPE_TIME = 3000;
 const int TOTAL_TIME = 60000;
 const int HOMING_TIME = 10000;
 
 // PID Control variables
-int SETPOINT = 250;
+u_int32_t SETPOINT = 250;
 const int GAIN = 5;
 int prevError = 0;
-const int LINE_FOLLOW_SPEED = 20;
+const int LINE_FOLLOW_SPEED = 40;
 int max_adjustment_speed = LINE_FOLLOW_SPEED + 10;
 float P, D, error = 0;
 int Lspeed = LINE_FOLLOW_SPEED;
