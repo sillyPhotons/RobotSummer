@@ -57,14 +57,15 @@ NewPing sonar2(TRIG2, ECHO2, 200);
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
-void run2_for_ms(Motor motor1, Motor motor2, int speed1, int speed2, int ms);
-void run1_for_ms(Motor motor1, int speed, int ms);
+void run2_for_ms(Motor* motor1, Motor* motor2, int speed1, int speed2, int ms);
+void run1_for_ms(Motor* motor1, int speed, int ms);
 float detect_1KHz(int num_samples);
 bool search(int max_distance, int spin_time, int increments);
 void PID(float L, float R);
 void checkLine();
 void pick_up_can();
 void dump();
+bool align();
 // void half_turn();
 // void ConfigureADC();
 
@@ -139,97 +140,144 @@ void ConfigureADC()
     HAL_ADC_ConfigChannel(&g_AdcHandle, &IRConfig);
 }
 
-/**
-  * Searches within the search radius for any objects
-  * @param search_radius: centimeters 
-  */
-bool search(int search_radius)
+bool found = false;
+const int search_time = 3000;
+const int align_time = 1000;
+
+bool align()
 {
     int t = HAL_GetTick();
-    float preError = 0;
-    bool found = false;
+    int preError = 0;
 
-    // This function will last for 4 seconds
-    while (HAL_GetTick() - t < 3500)
+    // aligning
+    while (HAL_GetTick() - t < align_time)
+    {
+        int cm = sonar.ping_cm(); // take distance measurement
+        int error = cm - TARGET_DISTANCE;
+
+        // move forward
+        if (error > 0)
+        {
+            // float P = 0 * error;
+            // float D = 0 * (error - preError);
+            // float adj = P + D;
+
+            // Lspeed = constrain(adj, 20, 40);
+            // Rspeed = constrain(adj, 20, 40);
+            // left_motor.run_motor(20 + adj);
+            // right_motor.run_motor(20 + adj);
+
+            left_motor.run_motor(20);
+            right_motor.run_motor(20);
+            // display.clearDisplay();
+            // display.setCursor(0, 0);
+            // display.print("Moving Forward: ");
+            // display.print(adj);
+            // display.display();
+        }
+
+        else if (error < 0)
+        {
+            float P = 1.5 * error;
+            float D = 0 * (error - preError);
+            float adj = P + D;
+
+            display.clearDisplay();
+            display.setCursor(0, 0);
+            display.print("ERROR DETECTED: ");
+            display.println(error);
+
+            /* 
+                    The following depends on you. My left motor is always 
+                    slower than the right when going in reverse. So here I try 
+                    to apply various corrections 
+                */
+            Lspeed = constrain(adj, -1 * 50, 40);
+            Rspeed = constrain(adj, -1 * 50, 40);
+
+            // if (Lspeed > -1 * 40 && Lspeed < 0)
+            // {
+            //     Lspeed = map(Lspeed, -50, 0, -47, -40);
+            // }
+            left_motor.run_motor(Lspeed);
+            right_motor.run_motor(Rspeed);
+            display.println(Lspeed);
+            display.println(Rspeed);
+            display.display();
+        }
+
+        prevError = error;
+    }
+    
+    int cm = sonar.ping_cm(); // take distance measurement
+    int error = cm - TARGET_DISTANCE;
+    bool complete = false;
+    if (abs(error) < 3){
+        complete = true;
+    }
+    return complete;
+}
+/**
+  * Searches within the search radius for any objects
+  * @param search_radius: centimeters
+  * @param l_or_r: 1 is right turn search, -1 is left turn search
+  */
+bool search(int search_radius, int l_or_r)
+{
+    int t = HAL_GetTick();
+
+    // searching
+    while (HAL_GetTick() - t < search_time)
     {
         int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
         int cm = sonar.ping_cm();   // take distance measurement
-        
+
+        // if cm2 is 0, then that means object is outside of detection range
+        if (cm2 == 0)
+        {
+            cm2 = 200;
+        }
+
         Serial1.print("Top: ");
         Serial1.println(cm2);
         Serial1.print("Bottom: ");
         Serial1.println(cm);
         // display.display();
 
-        int error = cm - TARGET_DISTANCE;
         // object is within search radius
         // error will equal -1*TARGET_DISTANCE if the object is out of range
-        if (cm < search_radius && error != -1.0 * TARGET_DISTANCE && cm2 > cm*3 && cm2 > 40)
+        // the top sensor detects at least twice the distance
+        // cm2 has minimum 40 **THIS IS CAUSE MY SENSOR WILL NEVER RETURN VALUE LESS THAN 20**!!
+        if (cm < search_radius && error != -1.0 * TARGET_DISTANCE && cm2 > cm * 2 && cm2 > 40)
         {
 
             Serial1.println("FOUND!");
             found = true;
-
-            if (error > 0)
-            {
-                float P = 0 * error;
-                float D = 0 * (error - preError);
-                prevError = error;
-                float adj = P + D;
-
-                Lspeed = constrain(adj, 20, 40);
-                Rspeed = constrain(adj, 20, 40);
-
-                left_motor.run_motor(20 + adj);
-                right_motor.run_motor(20 + adj);
-                display.clearDisplay();
-                display.setCursor(0, 0);
-                display.print("Moving Forward: ");
-                display.print(adj);
-                display.display();
-            }
-
-            else if (error < 0)
-            {
-                float P = 1.5 * error;
-                float D = 0 * (error - preError);
-                prevError = error;
-                float adj = P + D;
-
-                display.clearDisplay();
-                display.setCursor(0, 0);
-                display.print("ERROR DETECTED: ");
-                display.println(error);
-
-                /* 
-                    The following depends on you. My left motor is always 
-                    slower than the right when going in reverse. So here I try 
-                    to apply various corrections 
-                */
-                Lspeed = constrain(adj, -1 * 50, 40);
-                Rspeed = constrain(adj, -1 * 40, 40);
-
-                if (Lspeed > -1 * 40 && Lspeed < 0)
-                {
-                    Lspeed = map(Lspeed, -50, 0, -50, -42);
-                }
-                left_motor.run_motor(Lspeed);
-                right_motor.run_motor(Rspeed);
-                display.println(Lspeed);
-                display.println(Rspeed);
-                display.display();
-            }
         }
         else
         {
             found = false;
-            run2_for_ms(left_motor, right_motor, -55, 35, 50);
-            run2_for_ms(left_motor, right_motor, 0, 0, 150);
-            display.clearDisplay();
-            display.setCursor(0, 0);
-            display.print("SEARCH with radius: ");
-            display.println(search_radius);
-            display.display();
+            if (l_or_r == 1)
+            {
+                run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
+                run2_for_ms(&left_motor, &right_motor, 0, 0, 150);
+
+                Serial1.print("RIGHT with radius: ");
+                Serial1.println(search_radius);
+            }
+            else
+            {
+                run2_for_ms(&left_motor, &right_motor, 35, -35, 50);
+                run2_for_ms(&left_motor, &right_motor, 0, 0, 150);
+
+                Serial1.print("LEFT with radius: ");
+                Serial1.println(search_radius);
+            }
+            // display.clearDisplay();
+            // display.setCursor(0, 0);
+            // display.print("SEARCH with radius: ");
+            // display.println(search_radius);
+            // display.display();
         }
     }
     return found;
@@ -242,11 +290,19 @@ bool search(int search_radius)
     @param speed1, speed2: speed in [-100, 100]
     @param ms: number of milliseconds the motors will run for
 */
-void run2_for_ms(Motor motor1, Motor motor2, int speed1, int speed2, int ms)
+void run2_for_ms(Motor* motor1, Motor* motor2, int speed1, int speed2, int ms)
 {
     int current_tick = HAL_GetTick();
+    motor1->run_motor(speed1);
+    motor2->run_motor(speed2);
     while (HAL_GetTick() - current_tick < ms)
-    {
+    {   
+        float L = analogRead(L_SENSOR);
+        float R = analogRead(R_SENSOR);
+
+        if (L > SETPOINT || R > SETPOINT){
+            return;
+        }
         // if (speed1 > 0 && speed2 > 0)
         // {
         //     int cm2 = sonar2.ping_cm();
@@ -255,11 +311,9 @@ void run2_for_ms(Motor motor1, Motor motor2, int speed1, int speed2, int ms)
         //         break;
         //     }
         // }
-        motor1.run_motor(speed1);
-        motor2.run_motor(speed2);
     }
-    motor2.run_motor(0);
-    motor1.run_motor(0);
+    motor2->run_motor(0);
+    motor1->run_motor(0);
     return;
 }
 
@@ -270,12 +324,18 @@ void run2_for_ms(Motor motor1, Motor motor2, int speed1, int speed2, int ms)
     @param speed: speed in [-100, 100]
     @param ms: number of milliseconds the motor will run for
 */
-void run1_for_ms(Motor motor, int speed, int ms)
+void run1_for_ms(Motor* motor, int speed, int ms)
 {
     int current_tick = HAL_GetTick();
-
+    motor->run_motor(speed);
     while (HAL_GetTick() - current_tick < ms)
-    {   
+    {
+        float L = analogRead(L_SENSOR);
+        float R = analogRead(R_SENSOR);
+
+        if (L > SETPOINT || R > SETPOINT){
+            return;
+        }
         // if (speed > 0)
         // {
         //     int cm2 = sonar2.ping_cm();
@@ -284,9 +344,8 @@ void run1_for_ms(Motor motor, int speed, int ms)
         //         break;
         //     }
         // }
-        motor.run_motor(speed);
     }
-    motor.run_motor(0);
+    motor->run_motor(0);
     return;
 }
 
@@ -455,6 +514,7 @@ void PID(float L, float R)
     }
 
     prevError = error;
+
     right_motor.run_motor(Rspeed);
     left_motor.run_motor(Lspeed);
 }
@@ -463,11 +523,13 @@ void pick_up_can()
 {
     pwm_start(ARM_SERVO, 50, ARM_REST, MICROSEC_COMPARE_FORMAT);
     delay(1000);
-    run2_for_ms(right_motor, left_motor, 100, 100, 500);
+    run2_for_ms(&right_motor, &left_motor, 100, 100, 500);
     pwm_start(ARM_SERVO, 50, ARM_H_UP, MICROSEC_COMPARE_FORMAT);
-    run2_for_ms(right_motor, left_motor, 50, 50, 300);
+    run2_for_ms(&right_motor, &left_motor, 50, 50, 300);
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
-    run2_for_ms(right_motor, left_motor, 50, 50, 300);
+    run2_for_ms(&right_motor, &left_motor, 50, 50, 200);
+    run2_for_ms(&left_motor, &right_motor, -90, -90, 200);
+    run2_for_ms(&left_motor, &right_motor, -100, -100, 500);
 }
 
 /*
@@ -477,7 +539,7 @@ void dump()
 {
     pwm_start(ARM_SERVO, 50, ARM_REST, MICROSEC_COMPARE_FORMAT);
     delay(500);
-    run2_for_ms(left_motor, right_motor, 0, 0, 10);
+    run2_for_ms(&left_motor, &right_motor, 0, 0, 10);
     pwm_start(BIN_SERVO, 50, BIN_UP, MICROSEC_COMPARE_FORMAT);
     delay(3000);
     pwm_start(BIN_SERVO, 50, BIN_REST, MICROSEC_COMPARE_FORMAT);
@@ -488,43 +550,56 @@ void dump()
     Event loop
 */
 void loop()
-{
-    // checkLine();
+{   
+    checkLine();
+    // found = search(50, l_or_r);
+    // if (found){
+    //     int complete = align();
+    //     if (!complete){
+    //         found = false;
+    //         // l_or_r *= -1;
+    //     }
+    //     if (complete){
+    //         pick_up_can();
+    //         delay(1000);
+    //     }
+    // }
+    // checkLine(   );
     // // Get time since start in ms
-    int time_elapsed = HAL_GetTick() - start_time;
-    // Fixed time to travel on tape
-    if (time_elapsed < TAPE_TIME)
-    {
-        run2_for_ms(left_motor, right_motor, 20, 20, TAPE_TIME);
-    }
-    // After tape start search
-    else if (time_elapsed < TOTAL_TIME - HOMING_TIME)
-    {
-        bool found = search(max_distance);
-        if (!found)
-        {
-            max_distance += 15; // increase search radius if nothing found
-        }
-        if (found)
-        {
-            Serial1.println("Engaging!");
-            max_distance = MAX_DISTANCE;
-            // alignment correction
-            run2_for_ms(left_motor, right_motor, -55, 35, 50);
-            pick_up_can();
-            // Reverse the robot after raming into the can
-            run2_for_ms(left_motor, right_motor, -90, -90, 200);
-            run2_for_ms(left_motor, right_motor, -100, -100, 500);
-            delay(1000);
-            Serial1.println("Complete!");
-        }
-    }
-    else if (time_elapsed < TOTAL_TIME)
-    {
-        checkLine();
-        // Requires high current
-        // dump();
-    }
+    // int time_elapsed = HAL_GetTick() - start_time;
+    // // Fixed time to travel on tape
+    // if (time_elapsed < TAPE_TIME)
+    // {
+    //     run2_for_ms(left_motor, right_motor, 20, 20, TAPE_TIME);
+    // }
+    // // After tape start search
+    // else if (time_elapsed < TOTAL_TIME - HOMING_TIME)
+    // {
+    //     bool found = search(max_distance);
+    //     if (!found)
+    //     {
+    //         max_distance += 15; // increase search radius if nothing found
+    //     }
+    //     if (found)
+    //     {
+    //         Serial1.println("Engaging!");
+    //         max_distance = MAX_DISTANCE;
+    //         // alignment correction
+    //         run2_for_ms(left_motor, right_motor, -55, 35, 50);
+    //         pick_up_can();
+    //         // Reverse the robot after raming into the can
+    //         run2_for_ms(left_motor, right_motor, -90, -90, 200);
+    //         run2_for_ms(left_motor, right_motor, -100, -100, 500);
+    //         delay(1000);
+    //         Serial1.println("Complete!");
+    //     }
+    // }
+    // else if (time_elapsed < TOTAL_TIME)
+    // {
+    //     checkLine();
+    //     // Requires high current
+    //     // dump();
+    // }
 
     // float intensity = detect_1KHz(100);
     // Serial1.println(intensity);
