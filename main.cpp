@@ -1,9 +1,11 @@
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
 #include <NewPing.h>
-#include "main.h"
+#include <main.h>
 #include <vector>
 #include <numeric>
+#include <Bitmap.h>
+
 // #include "stm32f10x.h"
 // #include <stm32f1xx_hal_adc.h>
 // #include <stm32f1xx_hal.h>
@@ -34,7 +36,7 @@
 // Both TRIG and ECHO are Digital Pins
 #define TRIG PA11
 #define ECHO PA12
-#define MAX_DISTANCE 50
+#define MAX_DISTANCE 60
 #define TARGET_DISTANCE 30
 
 #define TRIG2 PB12
@@ -57,15 +59,17 @@ NewPing sonar2(TRIG2, ECHO2, 200);
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
-void run2_for_ms(Motor* motor1, Motor* motor2, int speed1, int speed2, int ms);
-void run1_for_ms(Motor* motor1, int speed, int ms);
+void run2_for_ms(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int ms);
+void run1_for_ms(Motor *motor1, int speed, unsigned int ms);
 float detect_1KHz(int num_samples);
 bool search(int max_distance, int spin_time, int increments);
 void PID(float L, float R);
 void checkLine();
-void pick_up_can();
+void pick_up_can(bool correction);
 void dump();
 bool align();
+void away_from_boundary();
+void new_direction();
 // void half_turn();
 // void ConfigureADC();
 
@@ -76,6 +80,7 @@ ADC_HandleTypeDef g_AdcHandle;
 */
 int max_distance = MAX_DISTANCE;
 int l_or_r = 1;
+bool following_tape = false;
 
 void setup()
 {
@@ -84,11 +89,14 @@ void setup()
     delay(100);
     pinMode(LED_DISPLAY, INPUT_PULLUP);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    display.display();
+    display.clearDisplay();
+    display.drawBitmap(0, 0,  fizzBitMap, 128, 64, WHITE);
+	display.display();
     display.setTextColor(SSD1306_WHITE);
+    delay(500);
     display.clearDisplay();
     display.setCursor(0, 0);
-    delay(500);
+    
 
     pinMode(TRIG, OUTPUT);
     pinMode(ECHO, INPUT);
@@ -101,7 +109,8 @@ void setup()
     pinMode(MOTOR_LF, OUTPUT);
     pinMode(MOTOR_LB, OUTPUT);
 
-    pwm_start(BIN_SERVO, 50, BIN_REST, MICROSEC_COMPARE_FORMAT);
+    pwm_start(BIN_SERVO, 50, BIN_REST, MICROSEC_COMPARE_FORMAT);\
+    delay(500);
     pwm_stop(BIN_SERVO);
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
     delay(500);
@@ -141,7 +150,7 @@ void ConfigureADC()
 }
 
 bool found = false;
-const int search_time = 3000;
+const int search_time = 5000;
 const int align_time = 1000;
 
 bool align()
@@ -178,7 +187,7 @@ bool align()
 
         else if (error < 0)
         {
-            float P = 1.5 * error;
+            float P = 2.0 * error;
             float D = 0 * (error - preError);
             float adj = P + D;
 
@@ -208,11 +217,12 @@ bool align()
 
         prevError = error;
     }
-    
+
     int cm = sonar.ping_cm(); // take distance measurement
     int error = cm - TARGET_DISTANCE;
     bool complete = false;
-    if (abs(error) < 3){
+    if (abs(error) < 3)
+    {
         complete = true;
     }
     return complete;
@@ -250,9 +260,9 @@ bool search(int search_radius, int l_or_r)
         // cm2 has minimum 40 **THIS IS CAUSE MY SENSOR WILL NEVER RETURN VALUE LESS THAN 20**!!
         if (cm < search_radius && error != -1.0 * TARGET_DISTANCE && cm2 > cm * 2 && cm2 > 40)
         {
-
             Serial1.println("FOUND!");
             found = true;
+            break;
         }
         else
         {
@@ -290,27 +300,25 @@ bool search(int search_radius, int l_or_r)
     @param speed1, speed2: speed in [-100, 100]
     @param ms: number of milliseconds the motors will run for
 */
-void run2_for_ms(Motor* motor1, Motor* motor2, int speed1, int speed2, int ms)
+void run2_for_ms(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int ms)
 {
-    int current_tick = HAL_GetTick();
+    unsigned int current_tick = HAL_GetTick();
     motor1->run_motor(speed1);
     motor2->run_motor(speed2);
     while (HAL_GetTick() - current_tick < ms)
-    {   
-        float L = analogRead(L_SENSOR);
-        float R = analogRead(R_SENSOR);
+    {
 
-        if (L > SETPOINT || R > SETPOINT){
-            return;
+        if ((speed1 > 0 && speed2 > 0) || (speed1 < 0 && speed2 < 0))
+        {
+            float L = analogRead(L_SENSOR);
+            float R = analogRead(R_SENSOR);
+
+            if (L > SETPOINT || R > SETPOINT)
+            {   
+                away_from_boundary();
+                return;
+            }
         }
-        // if (speed1 > 0 && speed2 > 0)
-        // {
-        //     int cm2 = sonar2.ping_cm();
-        //     if (cm2 <= TARGET_DISTANCE && cm2 != 0)
-        //     {
-        //         break;
-        //     }
-        // }
     }
     motor2->run_motor(0);
     motor1->run_motor(0);
@@ -324,16 +332,17 @@ void run2_for_ms(Motor* motor1, Motor* motor2, int speed1, int speed2, int ms)
     @param speed: speed in [-100, 100]
     @param ms: number of milliseconds the motor will run for
 */
-void run1_for_ms(Motor* motor, int speed, int ms)
+void run1_for_ms(Motor *motor, int speed, unsigned int ms)
 {
-    int current_tick = HAL_GetTick();
+    unsigned int current_tick = HAL_GetTick();
     motor->run_motor(speed);
     while (HAL_GetTick() - current_tick < ms)
     {
         float L = analogRead(L_SENSOR);
         float R = analogRead(R_SENSOR);
 
-        if (L > SETPOINT || R > SETPOINT){
+        if (L > SETPOINT || R > SETPOINT)
+        {
             return;
         }
         // if (speed > 0)
@@ -349,6 +358,43 @@ void run1_for_ms(Motor* motor, int speed, int ms)
     return;
 }
 
+void new_direction()
+{
+    int t = HAL_GetTick();
+    unsigned int turns = rand() % 1000;
+    while (HAL_GetTick() - t < turns)
+    {
+        left_motor.run_motor(-55);
+        right_motor.run_motor(35);
+    }
+    run2_for_ms(&left_motor, &right_motor, 25, 25, 1000);
+}
+
+void away_from_boundary()
+{
+    // left_motor.run_motor(0);
+    // right_motor.run_motor(0);
+    // float L = analogRead(L_SENSOR);
+    // float R = analogRead(R_SENSOR);
+    // display.clearDisplay();
+    // display.setCursor(0,0);
+    // display.println(L);
+    // display.println(R);
+    // display.display();
+
+    // delay(5000);
+
+    right_motor.run_motor(LINE_FOLLOW_SPEED);
+    left_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
+    prevError = 1;
+    unsigned int t = HAL_GetTick();
+    while (HAL_GetTick() - t < 1000){
+        checkLine();
+    }
+    right_motor.run_motor(LINE_FOLLOW_SPEED);
+    left_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
+    delay(300);
+}
 /*
     Returns the signal frequency intensity of thes detected IR signal.
     @param num_samples: number of samples to take. 
@@ -460,7 +506,6 @@ void checkLine()
     {
         R = SETPOINT;
     }
-
     if (L < SETPOINT && R < SETPOINT)
     {
 
@@ -473,6 +518,13 @@ void checkLine()
         {
             right_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
             left_motor.run_motor(LINE_FOLLOW_SPEED);
+        }
+    }
+    else if (L == SETPOINT && R == SETPOINT && following_tape){
+        unsigned int t = HAL_GetTick();
+        while ((HAL_GetTick() - t) < BACK_UP_TIME){
+            left_motor.run_motor(-80);
+            right_motor.run_motor(-80);
         }
     }
     else
@@ -490,6 +542,7 @@ Computes the adjustment for the motors based on how far off the sensors
 */
 void PID(float L, float R)
 {
+    following_tape = true;
     float R_diff = abs(R - SETPOINT) / ((R + SETPOINT) / 2.0);
     float L_diff = abs(L - SETPOINT) / ((L + SETPOINT) / 2.0);
 
@@ -519,9 +572,13 @@ void PID(float L, float R)
     left_motor.run_motor(Lspeed);
 }
 
-void pick_up_can()
+void pick_up_can(bool correction)
 {
     pwm_start(ARM_SERVO, 50, ARM_REST, MICROSEC_COMPARE_FORMAT);
+    if (correction)
+    {
+        run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
+    }
     delay(1000);
     run2_for_ms(&right_motor, &left_motor, 100, 100, 500);
     pwm_start(ARM_SERVO, 50, ARM_H_UP, MICROSEC_COMPARE_FORMAT);
@@ -551,60 +608,80 @@ void dump()
 */
 void loop()
 {   
-    checkLine();
+    // run2_for_ms(&left_motor, &right_motor, 20, 20, TAPE_TIME);
+
+    // run2_for_ms(&left_motor, &right_motor, 20, 20, 50);
+    // // checkLine();
     // found = search(50, l_or_r);
-    // if (found){
+    // if (found)
+    // {
     //     int complete = align();
-    //     if (!complete){
+    //     if (!complete)
+    //     {
     //         found = false;
     //         // l_or_r *= -1;
     //     }
-    //     if (complete){
-    //         pick_up_can();
+    //     if (complete)
+    //     {
+    //         pick_up_can(true);
     //         delay(1000);
     //     }
     // }
-    // checkLine(   );
-    // // Get time since start in ms
+    checkLine( );
+    
+    // Get time since start in ms
     // int time_elapsed = HAL_GetTick() - start_time;
     // // Fixed time to travel on tape
     // if (time_elapsed < TAPE_TIME)
     // {
-    //     run2_for_ms(left_motor, right_motor, 20, 20, TAPE_TIME);
+    //     run2_for_ms(&left_motor, &right_motor, 20, 20, TAPE_TIME);
     // }
-    // // After tape start search
+    // // // After tape start search
     // else if (time_elapsed < TOTAL_TIME - HOMING_TIME)
     // {
-    //     bool found = search(max_distance);
+    //     found = search(50, l_or_r);
     //     if (!found)
     //     {
-    //         max_distance += 15; // increase search radius if nothing found
+    //         new_direction();
+    //         // max_distance += 15; // increase search radius if nothing found
     //     }
     //     if (found)
     //     {
+    //         int complete = align();
+    //         if (!complete)
+    //         {
+    //             found = false;
+    //             // l_or_r *= -1;
+    //         }
+    //         if (complete)
+    //         {
+    //             pick_up_can(true);
+    //             delay(1000);
+    //         }
     //         Serial1.println("Engaging!");
-    //         max_distance = MAX_DISTANCE;
-    //         // alignment correction
-    //         run2_for_ms(left_motor, right_motor, -55, 35, 50);
-    //         pick_up_can();
-    //         // Reverse the robot after raming into the can
-    //         run2_for_ms(left_motor, right_motor, -90, -90, 200);
-    //         run2_for_ms(left_motor, right_motor, -100, -100, 500);
-    //         delay(1000);
     //         Serial1.println("Complete!");
     //     }
     // }
-    // else if (time_elapsed < TOTAL_TIME)
+    // // else if (time_elapsed < TOTAL_TIME)
+    // // {
+    // //     checkLine();
+    // //     // Requires high current
+    // //     // dump();
+    // // }
+    // else if (!dumped)
     // {
-    //     checkLine();
-    //     // Requires high current
-    //     // dump();
+    //     dump();
     // }
-
     // float intensity = detect_1KHz(100);
     // Serial1.println(intensity);
     // float L = analogRead(L_SENSOR);
     // float R = analogRead(R_SENSOR);
+    // display.clearDisplay();
+    // display.setCursor(0,0);
+    // display.println(L);
+    // display.println(R);
+    // display.display();
+
     // Serial1.println(L);
     // Serial1.println(R);
 
