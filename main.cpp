@@ -59,17 +59,16 @@ NewPing sonar2(TRIG2, ECHO2, 200);
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
-void run2_for_ms(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int ms);
+bool run2_for_ms(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int ms);
 void run1_for_ms(Motor *motor1, int speed, unsigned int ms);
 float detect_1KHz(int num_samples);
 bool search(int max_distance, int spin_time, int increments);
 void PID(float L, float R);
-void checkLine();
+bool checkLine();
 void pick_up_can(bool correction);
 void dump();
 bool align();
-void away_from_boundary();
-void new_direction();
+void new_direction(int travel_time);
 // void half_turn();
 // void ConfigureADC();
 
@@ -80,7 +79,7 @@ ADC_HandleTypeDef g_AdcHandle;
 */
 int max_distance = MAX_DISTANCE;
 int l_or_r = 1;
-bool following_tape = false;
+bool line_following = false;
 
 void setup()
 {
@@ -90,13 +89,13 @@ void setup()
     pinMode(LED_DISPLAY, INPUT_PULLUP);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
     display.clearDisplay();
-    display.drawBitmap(0, 0,  fizzBitMap, 128, 64, WHITE);
-	display.display();
+    display.drawBitmap(0, 0, fizzBitMap, 128, 64, WHITE);
+    display.display();
     display.setTextColor(SSD1306_WHITE);
-    delay(500);
+    display.setTextSize(2);
+    delay(200);
     display.clearDisplay();
     display.setCursor(0, 0);
-    
 
     pinMode(TRIG, OUTPUT);
     pinMode(ECHO, INPUT);
@@ -109,7 +108,7 @@ void setup()
     pinMode(MOTOR_LF, OUTPUT);
     pinMode(MOTOR_LB, OUTPUT);
 
-    pwm_start(BIN_SERVO, 50, BIN_REST, MICROSEC_COMPARE_FORMAT);\
+    pwm_start(BIN_SERVO, 50, BIN_REST, MICROSEC_COMPARE_FORMAT);
     delay(500);
     pwm_stop(BIN_SERVO);
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
@@ -150,8 +149,8 @@ void ConfigureADC()
 }
 
 bool found = false;
-const int search_time = 5000;
-const int align_time = 1000;
+const int search_time = 7000;
+const int align_time = 1500;
 
 bool align()
 {
@@ -204,10 +203,10 @@ bool align()
             Lspeed = constrain(adj, -1 * 50, 40);
             Rspeed = constrain(adj, -1 * 50, 40);
 
-            // if (Lspeed > -1 * 40 && Lspeed < 0)
-            // {
-            //     Lspeed = map(Lspeed, -50, 0, -47, -40);
-            // }
+            if (Lspeed > -1 * 40 && Lspeed < 0)
+            {
+                Lspeed = map(Lspeed, -50, 0, -47, -30);
+            }
             left_motor.run_motor(Lspeed);
             right_motor.run_motor(Rspeed);
             display.println(Lspeed);
@@ -227,6 +226,44 @@ bool align()
     }
     return complete;
 }
+
+bool linear_search(int search_radius, int travel_time)
+{
+
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.print(travel_time / 1000);
+    display.print("s L-SEARCH");
+    display.display();
+
+    int t = HAL_GetTick();
+
+    // searching
+    while (HAL_GetTick() - t < travel_time)
+    {
+        int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
+        int cm = sonar.ping_cm();   // take distance measurement
+
+        // if cm2 is 0, then that means object is outside of detection range
+        if (cm2 == 0)
+        {
+            cm2 = 200;
+        }
+        if (cm < search_radius && cm != 0 && cm2 > cm * 2 && cm2 > 40)
+        {
+            Serial1.println("FOUND!");
+            found = true;
+            break;
+        }
+        else
+        {
+            run2_for_ms(&left_motor, &right_motor, 40, 40, 100);
+            run2_for_ms(&left_motor, &right_motor, 0, 0, 100);
+        }
+    }
+    return found;
+}
+
 /**
   * Searches within the search radius for any objects
   * @param search_radius: centimeters
@@ -248,17 +285,11 @@ bool search(int search_radius, int l_or_r)
             cm2 = 200;
         }
 
-        Serial1.print("Top: ");
-        Serial1.println(cm2);
-        Serial1.print("Bottom: ");
-        Serial1.println(cm);
-        // display.display();
-
         // object is within search radius
         // error will equal -1*TARGET_DISTANCE if the object is out of range
         // the top sensor detects at least twice the distance
         // cm2 has minimum 40 **THIS IS CAUSE MY SENSOR WILL NEVER RETURN VALUE LESS THAN 20**!!
-        if (cm < search_radius && error != -1.0 * TARGET_DISTANCE && cm2 > cm * 2 && cm2 > 40)
+        if (cm < search_radius && cm != 0 && cm2 > cm * 2 && cm2 > 40)
         {
             Serial1.println("FOUND!");
             found = true;
@@ -299,30 +330,39 @@ bool search(int search_radius, int l_or_r)
     @param motor1, motor2: motor objects
     @param speed1, speed2: speed in [-100, 100]
     @param ms: number of milliseconds the motors will run for
+
+    @returns: a boolean. True if the action was completed, false if it was interrupted
 */
-void run2_for_ms(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int ms)
+bool run2_for_ms(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int ms)
 {
     unsigned int current_tick = HAL_GetTick();
     motor1->run_motor(speed1);
     motor2->run_motor(speed2);
     while (HAL_GetTick() - current_tick < ms)
     {
-
         if ((speed1 > 0 && speed2 > 0) || (speed1 < 0 && speed2 < 0))
         {
             float L = analogRead(L_SENSOR);
             float R = analogRead(R_SENSOR);
 
             if (L > SETPOINT || R > SETPOINT)
-            {   
-                away_from_boundary();
-                return;
+            {
+                motor1->run_motor(-10);
+                motor2->run_motor(-10);
+                pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+                delay(500);
+                motor1->run_motor(-50);
+                motor2->run_motor(-50);
+                delay(200);
+                pwm_stop(ARM_SERVO);
+                new_direction(1000);
+                return false;
             }
         }
     }
     motor2->run_motor(0);
     motor1->run_motor(0);
-    return;
+    return true;
 }
 
 /*
@@ -358,7 +398,7 @@ void run1_for_ms(Motor *motor, int speed, unsigned int ms)
     return;
 }
 
-void new_direction()
+void new_direction(int travel_time)
 {
     int t = HAL_GetTick();
     unsigned int turns = rand() % 1000;
@@ -367,7 +407,7 @@ void new_direction()
         left_motor.run_motor(-55);
         right_motor.run_motor(35);
     }
-    run2_for_ms(&left_motor, &right_motor, 25, 25, 1000);
+    linear_search(50, travel_time);
 }
 
 void away_from_boundary()
@@ -388,7 +428,8 @@ void away_from_boundary()
     left_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
     prevError = 1;
     unsigned int t = HAL_GetTick();
-    while (HAL_GetTick() - t < 1000){
+    while (HAL_GetTick() - t < 1000)
+    {
         checkLine();
     }
     right_motor.run_motor(LINE_FOLLOW_SPEED);
@@ -492,8 +533,10 @@ void to_IR_BEACON()
 Checks if robot sees the line or not.
 If yes, PID line following.
 If no, sharp turn based on previous location to find the line
+
+returns: true if complete
 */
-void checkLine()
+bool checkLine()
 {
     float L = analogRead(L_SENSOR);
     float R = analogRead(R_SENSOR);
@@ -508,29 +551,40 @@ void checkLine()
     }
     if (L < SETPOINT && R < SETPOINT)
     {
-
-        if (prevError > 0)
+        if (((L / R > 2.0) || (R / L > 2.0)) && ((L > 250) || R > 250))
         {
-            right_motor.run_motor(LINE_FOLLOW_SPEED);
-            left_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
+            PID(L, R);
         }
-        else if (prevError < 0)
+
+        else
         {
-            right_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
-            left_motor.run_motor(LINE_FOLLOW_SPEED);
+            if (prevError > 0)
+            {
+                right_motor.run_motor(LINE_FOLLOW_SPEED);
+                left_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
+            }
+            else if (prevError < 0)
+            {
+                right_motor.run_motor(-1.0 * LINE_FOLLOW_SPEED);
+                left_motor.run_motor(LINE_FOLLOW_SPEED);
+            }
         }
     }
-    else if (L == SETPOINT && R == SETPOINT && following_tape){
-        unsigned int t = HAL_GetTick();
-        while ((HAL_GetTick() - t) < BACK_UP_TIME){
-            left_motor.run_motor(-80);
-            right_motor.run_motor(-80);
+    // ONLY FOR FOR ENDING
+    else if (L == SETPOINT && R == SETPOINT)
+    {
+        if (line_following)
+        {
+            return true;
         }
     }
     else
     {
         PID(L, R);
+        return false;
     }
+
+    return false;
 }
 
 /*
@@ -542,7 +596,7 @@ Computes the adjustment for the motors based on how far off the sensors
 */
 void PID(float L, float R)
 {
-    following_tape = true;
+
     float R_diff = abs(R - SETPOINT) / ((R + SETPOINT) / 2.0);
     float L_diff = abs(L - SETPOINT) / ((L + SETPOINT) / 2.0);
 
@@ -580,13 +634,14 @@ void pick_up_can(bool correction)
         run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
     }
     delay(1000);
+
     run2_for_ms(&right_motor, &left_motor, 100, 100, 500);
     pwm_start(ARM_SERVO, 50, ARM_H_UP, MICROSEC_COMPARE_FORMAT);
     run2_for_ms(&right_motor, &left_motor, 50, 50, 300);
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
     run2_for_ms(&right_motor, &left_motor, 50, 50, 200);
-    run2_for_ms(&left_motor, &right_motor, -90, -90, 200);
-    run2_for_ms(&left_motor, &right_motor, -100, -100, 500);
+    run2_for_ms(&left_motor, &right_motor, -80, -80, 200);
+    run2_for_ms(&left_motor, &right_motor, -100, -100, 300);
 }
 
 /*
@@ -607,7 +662,7 @@ void dump()
     Event loop
 */
 void loop()
-{   
+{
     // run2_for_ms(&left_motor, &right_motor, 20, 20, TAPE_TIME);
 
     // run2_for_ms(&left_motor, &right_motor, 20, 20, 50);
@@ -627,50 +682,138 @@ void loop()
     //         delay(1000);
     //     }
     // }
-    checkLine( );
-    
+    // else {
+    //     new_direction(3000);
+    // }
+
+    // checkLine();
+
     // Get time since start in ms
-    // int time_elapsed = HAL_GetTick() - start_time;
-    // // Fixed time to travel on tape
-    // if (time_elapsed < TAPE_TIME)
+    int time_elapsed = HAL_GetTick() - start_time;
+    // Fixed time to travel on tape
+    if (time_elapsed < TAPE_TIME)
+    {
+        left_motor.run_motor(20);
+        right_motor.run_motor(20);
+    }
+    // // After tape start search
+    else if (time_elapsed < TOTAL_TIME - HOMING_TIME)
+    {
+        found = search(50, l_or_r);
+        if (!found)
+        {
+            display.clearDisplay();
+            display.setCursor(0, 0);
+            display.println("New Direction");
+            display.display();
+            new_direction(3000);
+        }
+        if (found)
+        {
+            int complete = align();
+            if (!complete)
+            {
+                found = false;
+                // l_or_r *= -1;
+            }
+            if (complete)
+            {
+                display.clearDisplay();
+                display.setCursor(0, 0);
+                display.println("Aligned");
+                display.display();
+                pick_up_can(true);
+                delay(1000);
+            }
+        }
+    }
+    else if (time_elapsed < TOTAL_TIME & !line_following)
+    {
+        float L = analogRead(L_SENSOR);
+        float R = analogRead(R_SENSOR);
+
+        if (L < SETPOINT || R < SETPOINT)
+        {
+            display.clearDisplay();
+            display.setCursor(0, 0);
+            display.println(L);
+            display.println(R);
+            display.display();
+            left_motor.run_motor(40);
+            right_motor.run_motor(40);
+        }
+
+        else if (L >= SETPOINT || R >= SETPOINT)
+        {
+            while ((L >= SETPOINT && R >= SETPOINT) || (L < SETPOINT && R < SETPOINT))
+            {
+                L = analogRead(L_SENSOR);
+                R = analogRead(R_SENSOR);
+                run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
+                run2_for_ms(&left_motor, &right_motor, 0, 0, 150);
+            }
+            line_following = true;
+            checkLine();
+        }
+    }
+    else if (time_elapsed < TOTAL_TIME && line_following)
+    {
+        bool end = checkLine();
+        if (end)
+        {
+            unsigned int t = HAL_GetTick();
+            while ((HAL_GetTick() - t) < BACK_UP_TIME)
+            {
+                left_motor.run_motor(-60);
+                right_motor.run_motor(-60);
+            }
+        }
+    }
+    else if (!dumped)
+    {
+        dump();
+    }
+
+    // if (time_elapsed < TOTAL_TIME && !line_following)
     // {
-    //     run2_for_ms(&left_motor, &right_motor, 20, 20, TAPE_TIME);
-    // }
-    // // // After tape start search
-    // else if (time_elapsed < TOTAL_TIME - HOMING_TIME)
-    // {
-    //     found = search(50, l_or_r);
-    //     if (!found)
+    //     float L = analogRead(L_SENSOR);
+    //     float R = analogRead(R_SENSOR);
+
+    //     if (L < SETPOINT || R < SETPOINT)
     //     {
-    //         new_direction();
-    //         // max_distance += 15; // increase search radius if nothing found
+    //         display.clearDisplay();
+    //         display.setCursor(0, 0);
+    //         display.println(L);
+    //         display.println(R);
+    //         display.display();
+    //         left_motor.run_motor(40);
+    //         right_motor.run_motor(40);
     //     }
-    //     if (found)
+
+    //     else if (L >= SETPOINT || R >= SETPOINT)
     //     {
-    //         int complete = align();
-    //         if (!complete)
+    //         while ((L >= SETPOINT && R >= SETPOINT) || (L < SETPOINT && R < SETPOINT))
     //         {
-    //             found = false;
-    //             // l_or_r *= -1;
+    //             L = analogRead(L_SENSOR);
+    //             R = analogRead(R_SENSOR);
+    //             run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
+    //             run2_for_ms(&left_motor, &right_motor, 0, 0, 150);
     //         }
-    //         if (complete)
-    //         {
-    //             pick_up_can(true);
-    //             delay(1000);
-    //         }
-    //         Serial1.println("Engaging!");
-    //         Serial1.println("Complete!");
+    //         line_following = true;
+    //         checkLine();
     //     }
     // }
-    // // else if (time_elapsed < TOTAL_TIME)
-    // // {
-    // //     checkLine();
-    // //     // Requires high current
-    // //     // dump();
-    // // }
-    // else if (!dumped)
+    // else if (time_elapsed < TOTAL_TIME && line_following)
     // {
-    //     dump();
+    //     bool end = checkLine();
+    //     if(end){
+    //         unsigned int t = HAL_GetTick();
+    //         while ((HAL_GetTick() - t) < BACK_UP_TIME)
+    //         {
+    //             left_motor.run_motor(-60);
+    //             right_motor.run_motor(-60);
+    //         }
+    //     }
     // }
     // float intensity = detect_1KHz(100);
     // Serial1.println(intensity);
