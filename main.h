@@ -22,7 +22,7 @@
 // Both TRIG and ECHO are Digital Pins
 #define TRIG PA11
 #define ECHO PA12
-#define MAX_DISTANCE 60
+#define MAX_DISTANCE 70
 #define TARGET_DISTANCE 30
 
 #define TRIG2 PB12
@@ -42,16 +42,16 @@
 const int start_time = HAL_GetTick();
 const int TAPE_TIME = 3000;
 const int TOTAL_TIME = 60000;
-const int HOMING_TIME = 20000;
+const int HOMING_TIME = 55000;
 const int BACK_UP_TIME = 1000;
 
 // PID Control variables
 
 // line following
-short SETPOINT = 300;
+short SETPOINT = 60;
 const short GAIN = 5;
 short prevError = 0;
-const short LINE_FOLLOW_SPEED = 25;
+const short LINE_FOLLOW_SPEED = 30;
 short max_adjustment_speed = LINE_FOLLOW_SPEED + 10;
 float P, D, error = 0;
 short Lspeed = LINE_FOLLOW_SPEED;
