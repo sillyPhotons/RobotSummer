@@ -106,65 +106,6 @@ void run1_for_ms(Motor *motor, short speed, unsigned int ms)
     return;
 }
 
-bool find_tape()
-{
-    short L = analogRead(L_SENSOR),
-          R = analogRead(R_SENSOR);
-
-    if (L < SETPOINT && R < SETPOINT)
-    {
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.println("TO TAPE");
-        display.println(L);
-        display.println(R);
-        display.display();
-        left_motor.run_motor(30);
-        right_motor.run_motor(30);
-        return false;
-    }
-
-    else
-    {
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.println("TAPE FOUND");
-        display.display();
-
-        while (true)
-        {
-            L = analogRead(L_SENSOR);
-            R = analogRead(R_SENSOR);
-            if (L >= SETPOINT)
-            {
-                if (R < SETPOINT)
-                {
-                    break;
-                }
-            }
-            else if (R >= SETPOINT)
-            {
-                if (L < SETPOINT)
-                {
-                    break;
-                }
-            }
-            run2_for_ms(&left_motor, &right_motor, 0, 0, 75);
-            run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
-            run2_for_ms(&left_motor, &right_motor, 0, 0, 75);
-        }
-        left_motor.run_motor(0);
-        right_motor.run_motor(0);
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.println("1 SENSOR ON TAPE");
-        display.println(L);
-        display.println(R);
-        display.display();
-        return true;
-    }
-}
-
 void away()
 {
     int t = HAL_GetTick();

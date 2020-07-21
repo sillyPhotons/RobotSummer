@@ -4,6 +4,9 @@
 #ifndef HARDWARE_H
 #define HARDWARE_H
 
+#define PGAIN PA5        // Potentiometer
+#define DGAIN PA4        // Potentiometer
+
 #define LED_DISPLAY PB12 // OLED
 
 // Left motor
@@ -53,7 +56,6 @@ static Motor right_motor = Motor(MOTOR_RF, MOTOR_RB);
 
 void dump();
 void away();
-bool find_tape();
 void pick_up_can(bool correction);
 void run1_for_ms(Motor *motor1, short speed, unsigned int ms);
 bool run2_for_ms(Motor *motor1, Motor *motor2, short speed1, short speed2, unsigned int ms);

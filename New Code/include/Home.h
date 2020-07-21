@@ -4,6 +4,7 @@
 #ifndef HOME_H
 #define HOME_H
 
+bool find_tape();
 bool checkLine();
 void PID(float L, float R);
 

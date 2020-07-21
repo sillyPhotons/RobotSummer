@@ -3,8 +3,13 @@
 #include <Hardware.h>
 #include <Home.h>
 
+// Timing variables
+const int start_time = HAL_GetTick();
+
 void setup()
 {
+    Serial1.begin(115200);
+
     delay(100);
     pinMode(LED_DISPLAY, INPUT_PULLUP);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -12,7 +17,7 @@ void setup()
     display.drawBitmap(0, 0, fizzBitMap, 128, 64, WHITE);
     display.display();
     display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(2);
+    display.setTextSize(3);
     delay(200);
     display.clearDisplay();
     display.setCursor(0, 0);
@@ -37,22 +42,29 @@ void setup()
 }
 
 short state = entering;
-Home Home_Manager = Home(4000);
-Search Search_Manager = Search(10, 5, 6);
+Home Home_Manager = Home(4000); // 4 second delay before recognizing both sensor high as end point
+Search Search_Manager = Search(15, 5, 8);
 int time_elapsed = 0;
+unsigned short counter = 1;
 
-/**
- * Event loop
-*/
 void loop()
 {
     time_elapsed = HAL_GetTick() - start_time;
+
+    if (counter % 20 == 0)
+    {
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.print(time_elapsed/1000.0);
+        display.display();
+        counter = 1;
+    }
 
     if (time_elapsed < TAPE_TIME)
     {
         state = entering;
     }
-    else if (time_elapsed < TOTAL_TIME - HOMING_TIME)
+    else if (time_elapsed < TOTAL_TIME - TAPE_TIME - HOMING_TIME)
     {
         state = searching;
     }
@@ -61,11 +73,11 @@ void loop()
         state = homing;
     }
 
+    // Serial1.printf("Global: %d\n", state);
     switch (state)
     {
     case entering:
-        left_motor.run_motor(35);
-        right_motor.run_motor(35);
+        Search_Manager.enter_arena();
         break;
 
     case searching:
@@ -76,4 +88,5 @@ void loop()
         Home_Manager.loop();
         break;
     }
+    counter += 1;
 };

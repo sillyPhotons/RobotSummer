@@ -4,8 +4,8 @@
 #include <main.h>
 #include <Hardware.h>
 
-#define MAX_DISTANCE 70
-#define TARGET_DISTANCE 30
+#define MAX_DISTANCE 60
+#define TARGET_DISTANCE 34
 
 struct Search
 {
@@ -14,6 +14,7 @@ struct Search
         linear_search_counter = max_linear_search_fail;
     };
     void loop();
+    void enter_arena();
 
 private:
     int max_search_fail = 0;

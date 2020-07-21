@@ -2,6 +2,7 @@
 
 void Search::loop()
 {
+    // Serial1.printf("\tSearch state: %d\n", state);
     switch (state)
     {
     case 1: // spherical search
@@ -16,7 +17,12 @@ void Search::loop()
         update_state(true);
         break;
     case 4: // new direction
+        // Serial1.printf("New Direction\n");
         update_state(new_direction());
+        break;
+    case 5: // linear search
+        update_state(linear_search(MAX_DISTANCE));
+        // Serial1.printf("Linear Search\n");
         break;
     }
 }
@@ -34,6 +40,7 @@ void Search::update_state(bool result)
         else
         {
             search_fail += 1;
+            // Serial1.printf("\t\tFail: %d\n", search_fail);
         }
         if (search_fail > max_search_fail)
         {
@@ -61,6 +68,9 @@ void Search::update_state(bool result)
         state = 1;
         break;
     case 4:
+        state = 5;
+        break;
+    case 5:
         if (result)
         {
             state = 2;
@@ -72,7 +82,7 @@ void Search::update_state(bool result)
         }
         if (linear_search_counter > 0)
         {
-            state = 4;
+            state = 5;
         }
         else
         {
@@ -80,6 +90,27 @@ void Search::update_state(bool result)
             state = 1;
         }
         break;
+    }
+}
+
+void Search::enter_arena()
+{
+    int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
+    int cm = sonar.ping_cm();   // take distance measurement
+
+    if (cm2 == 0)
+    {
+        cm2 = 200;
+    }
+    if (cm < TARGET_DISTANCE && cm != 0 && cm2 > cm * 2 && cm2 > 40)
+    {
+        left_motor.run_motor(0);
+        right_motor.run_motor(0);
+    }
+    else
+    {
+        left_motor.run_motor(50);
+        right_motor.run_motor(50);
     }
 }
 
@@ -92,17 +123,14 @@ bool new_direction()
         left_motor.run_motor(-55);
         right_motor.run_motor(35);
     }
-    return linear_search(MAX_DISTANCE);
+    return true;
 }
 
 bool align()
 {
+
     int cm = sonar.ping_cm(); // take distance measurement
     int error = cm - TARGET_DISTANCE;
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.print("ERROR: ");
-    display.println(error);
 
     // move forward
     if (error > 0)
@@ -138,6 +166,7 @@ bool align()
 
     error = sonar.ping_cm() - TARGET_DISTANCE;
     bool complete = false;
+
     if (abs((int)error) < 3)
     {
         complete = true;
@@ -147,10 +176,10 @@ bool align()
 
 bool linear_search(short search_radius)
 {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.print("LINE SEARCH");
-    display.display();
+    // display.clearDisplay();
+    // display.setCursor(0, 0);
+    // display.print("LINE SEARCH");
+    // display.display();
 
     int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
     int cm = sonar.ping_cm();   // take distance measurement
@@ -165,8 +194,8 @@ bool linear_search(short search_radius)
     }
     else
     {
-        run2_for_ms(&left_motor, &right_motor, 40, 40, 100);
-        run2_for_ms(&left_motor, &right_motor, 0, 0, 100);
+        run2_for_ms(&left_motor, &right_motor, 50, 50, 120);
+        run2_for_ms(&left_motor, &right_motor, 0, 0, 80);
     }
     return false;
 }

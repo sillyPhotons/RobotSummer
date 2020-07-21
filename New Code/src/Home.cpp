@@ -1,7 +1,7 @@
 #include <Home.h>
 
 short prevError = 0;
-short LINE_FOLLOW_SPEED = 30;
+short LINE_FOLLOW_SPEED = 35;
 short max_adjustment_speed = LINE_FOLLOW_SPEED + 10;
 float P, D, error = 0;
 short Lspeed = 30,
@@ -9,6 +9,7 @@ short Lspeed = 30,
 
 void Home::loop()
 {
+    Serial1.printf("\tHoming state: %d\n", state);
     switch (state)
     {
     case 1: // looking for tape
@@ -27,8 +28,8 @@ void Home::loop()
         unsigned int t = HAL_GetTick();
         while ((HAL_GetTick() - t) < BACK_UP_TIME)
         {
-            left_motor.run_motor(-50);
-            right_motor.run_motor(-40);
+            left_motor.run_motor(-100);
+            right_motor.run_motor(-100);
         }
         left_motor.run_motor(0);
         right_motor.run_motor(0);
@@ -41,8 +42,13 @@ void Home::loop()
         dump();
         left_motor.run_motor(0);
         right_motor.run_motor(0);
+        update_state(true);
         break;
     }
+
+    case 5: // complete
+        update_state(true);
+        break;
     }
 }
 void Home::update_state(bool result)
@@ -58,9 +64,12 @@ void Home::update_state(bool result)
         break;
 
     case 2: // found tape, homing
-        if (HAL_GetTick() - t_initial >= ms_before_both_high)
+        if (HAL_GetTick() - t_initial >= ms_before_both_high && result)
         {
             state = 3;
+        }
+        else{
+            state = 2;
         }
         break;
 
@@ -69,6 +78,9 @@ void Home::update_state(bool result)
         break;
 
     case 4: // dumping
+        state = 5;
+        break;
+    case 5:
         break;
     }
 }
@@ -168,4 +180,66 @@ void PID(float L, float R)
 
     right_motor.run_motor(Rspeed);
     left_motor.run_motor(Lspeed);
+}
+
+bool find_tape()
+{
+    short L = analogRead(L_SENSOR),
+          R = analogRead(R_SENSOR);
+
+    if (L < SETPOINT && R < SETPOINT)
+    {
+        // Serial1.println("TO TAPE");
+        // Serial1.println(L);
+        // Serial1.println(R);
+        // display.clearDisplay();
+        // display.setCursor(0, 0);
+        // display.println("TO TAPE");
+        // display.println(L);
+        // display.println(R);
+        // display.display();
+        left_motor.run_motor(30);
+        right_motor.run_motor(30);
+        return false;
+    }
+
+    else
+    {
+        // display.clearDisplay();
+        // display.setCursor(0, 0);
+        // display.println("TAPE FOUND");
+        // display.display();
+
+        while (true)
+        {
+            L = analogRead(L_SENSOR);
+            R = analogRead(R_SENSOR);
+            if (L >= SETPOINT)
+            {
+                if (R < SETPOINT)
+                {
+                    break;
+                }
+            }
+            else if (R >= SETPOINT)
+            {
+                if (L < SETPOINT)
+                {
+                    break;
+                }
+            }
+            run2_for_ms(&left_motor, &right_motor, 0, 0, 75);
+            run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
+            run2_for_ms(&left_motor, &right_motor, 0, 0, 75);
+        }
+        left_motor.run_motor(0);
+        right_motor.run_motor(0);
+        // display.clearDisplay();
+        // display.setCursor(0, 0);
+        // display.println("1 SENSOR ON TAPE");
+        // display.println(L);
+        // display.println(R);
+        // display.display();
+        return true;
+    }
 }
