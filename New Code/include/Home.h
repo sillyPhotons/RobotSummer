@@ -23,7 +23,7 @@ private:
 
 extern short prevError;
 extern short LINE_FOLLOW_SPEED;
-extern short max_adjustment_speed;
+// extern short max_adjustment_speed;
 extern float P, D, error;
 extern short Lspeed;
 extern short Rspeed;

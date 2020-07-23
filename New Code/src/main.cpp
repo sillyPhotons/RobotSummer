@@ -51,7 +51,7 @@ void loop()
 {
     time_elapsed = HAL_GetTick() - start_time;
 
-    if (counter % 20 == 0)
+    if (counter % 10 == 0)
     {
         display.clearDisplay();
         display.setCursor(0, 0);
@@ -73,7 +73,6 @@ void loop()
         state = homing;
     }
 
-    // Serial1.printf("Global: %d\n", state);
     switch (state)
     {
     case entering:

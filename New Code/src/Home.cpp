@@ -1,8 +1,7 @@
 #include <Home.h>
 
 short prevError = 0;
-short LINE_FOLLOW_SPEED = 35;
-short max_adjustment_speed = LINE_FOLLOW_SPEED + 10;
+short LINE_FOLLOW_SPEED = 33;
 float P, D, error = 0;
 short Lspeed = 30,
       Rspeed = 30;
@@ -95,12 +94,6 @@ bool checkLine()
 {
     short L = analogRead(L_SENSOR);
     short R = analogRead(R_SENSOR);
-    // display.clearDisplay();
-    // display.setCursor(0, 0);
-    // display.println("FOLLOWING ");
-    // display.println(L);
-    // display.println(R);
-    // display.display();
 
     if (L > SETPOINT)
     {
@@ -228,18 +221,12 @@ bool find_tape()
                     break;
                 }
             }
-            run2_for_ms(&left_motor, &right_motor, 0, 0, 75);
-            run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
-            run2_for_ms(&left_motor, &right_motor, 0, 0, 75);
+            run_both(0, 0, 75);
+            run_both(-55, 35, 50);
+            run_both(0, 0, 75);
         }
         left_motor.run_motor(0);
         right_motor.run_motor(0);
-        // display.clearDisplay();
-        // display.setCursor(0, 0);
-        // display.println("1 SENSOR ON TAPE");
-        // display.println(L);
-        // display.println(R);
-        // display.display();
         return true;
     }
 }

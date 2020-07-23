@@ -24,6 +24,7 @@ private:
     int state = 1;
     int max_linear_search_fail = 0;
     int linear_search_counter = 0;
+    int direction = 1; // 1 is right -1 is left
 
     void update_state(bool result);
 };

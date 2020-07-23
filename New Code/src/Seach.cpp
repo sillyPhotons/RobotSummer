@@ -6,7 +6,7 @@ void Search::loop()
     switch (state)
     {
     case 1: // spherical search
-        update_state(search(MAX_DISTANCE, 1));
+        update_state(search(MAX_DISTANCE, direction));
         break;
     case 2: // alignment
         update_state(align());
@@ -45,6 +45,7 @@ void Search::update_state(bool result)
         if (search_fail > max_search_fail)
         {
             search_fail = 0;
+            direction *= -1;
             state = 4;
         }
         break;
@@ -95,8 +96,8 @@ void Search::update_state(bool result)
 
 void Search::enter_arena()
 {
-    int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
-    int cm = sonar.ping_cm();   // take distance measurement
+    int cm2 = sonar2.ping_median(3) / 57; // take distance measurement to see if it is a bin
+    int cm = sonar.ping_cm();             // take distance measurement
 
     if (cm2 == 0)
     {
@@ -118,17 +119,16 @@ bool new_direction()
 {
     int t = HAL_GetTick();
     unsigned int turns = rand() % 800;
+    left_motor.run_motor(-55);
+    right_motor.run_motor(35);
     while (HAL_GetTick() - t < turns)
     {
-        left_motor.run_motor(-55);
-        right_motor.run_motor(35);
     }
     return true;
 }
 
 bool align()
 {
-
     int cm = sonar.ping_cm(); // take distance measurement
     int error = cm - TARGET_DISTANCE;
 
@@ -194,8 +194,8 @@ bool linear_search(short search_radius)
     }
     else
     {
-        run2_for_ms(&left_motor, &right_motor, 50, 50, 120);
-        run2_for_ms(&left_motor, &right_motor, 0, 0, 80);
+        run_both(50, 50, 120);
+        run_both(0, 0, 80);
     }
     return false;
 }
@@ -208,8 +208,8 @@ bool linear_search(short search_radius)
 bool search(int search_radius, int l_or_r)
 {
 
-    int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
-    int cm = sonar.ping_cm();   // take distance measurement
+    int cm2 = sonar2.ping_cm();         // take distance measurement to see if it is a bin
+    int cm = sonar.ping_median(2) / 57; // take distance measurement
 
     // if cm2 is 0, then that means object is outside of detection range
     if (cm2 == 0)
@@ -229,13 +229,13 @@ bool search(int search_radius, int l_or_r)
     {
         if (l_or_r == 1)
         {
-            run2_for_ms(&left_motor, &right_motor, -55, 35, 50);
-            run2_for_ms(&left_motor, &right_motor, 0, 0, 150);
+            run_both(-55, 35, 50);
+            run_both(0, 0, 140);
         }
         else
         {
-            run2_for_ms(&left_motor, &right_motor, 35, -35, 50);
-            run2_for_ms(&left_motor, &right_motor, 0, 0, 150);
+            run_both(55, -35, 50);
+            run_both(0, 0, 140);
         }
         return false;
     }
