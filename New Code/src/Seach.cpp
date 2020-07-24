@@ -45,7 +45,8 @@ void Search::update_state(bool result)
         if (search_fail > max_search_fail)
         {
             search_fail = 0;
-            direction *= -1;
+            // direction *= -1;
+            direction *= 1;
             state = 4;
         }
         break;
@@ -141,7 +142,7 @@ bool align()
 
     else if (error < 0)
     {
-        float P = 1.2 * error;
+        float P = 1.4 * error;
         float D = 0;
         float adj = P + D;
 

@@ -109,7 +109,7 @@ void pick_up_can(bool correction)
     {
         run_both(-55, 35, 50);
     }
-    delay(1000);
+    delay(600);
 
     bool mot_1 = run_both(100, 100, 500);
     if (!mot_1)

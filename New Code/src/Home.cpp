@@ -25,10 +25,10 @@ void Home::loop()
     case 3: // both sensors high
     {
         unsigned int t = HAL_GetTick();
+        left_motor.run_motor(-100);
+        right_motor.run_motor(-100);
         while ((HAL_GetTick() - t) < BACK_UP_TIME)
         {
-            left_motor.run_motor(-100);
-            right_motor.run_motor(-100);
         }
         left_motor.run_motor(0);
         right_motor.run_motor(0);
@@ -67,7 +67,8 @@ void Home::update_state(bool result)
         {
             state = 3;
         }
-        else{
+        else
+        {
             state = 2;
         }
         break;
@@ -198,11 +199,6 @@ bool find_tape()
 
     else
     {
-        // display.clearDisplay();
-        // display.setCursor(0, 0);
-        // display.println("TAPE FOUND");
-        // display.display();
-
         while (true)
         {
             L = analogRead(L_SENSOR);
