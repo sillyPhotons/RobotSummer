@@ -12,8 +12,8 @@ void Search::loop()
         update_state(align());
         break;
     case 3: // pickup cans
-        pick_up_can(true);
-        delay(1000);
+        pick_up_can(false);
+        delay(300);
         update_state(true);
         break;
     case 4: // new direction
@@ -130,14 +130,14 @@ bool new_direction()
 
 bool align()
 {
+    bool complete = false;
     int cm = sonar.ping_cm(); // take distance measurement
     int error = cm - TARGET_DISTANCE;
-
     // move forward
     if (error > 0)
     {
-        left_motor.run_motor(20);
         right_motor.run_motor(20);
+        left_motor.run_motor(20);
     }
 
     else if (error < 0)
@@ -145,43 +145,35 @@ bool align()
         float P = 1.4 * error;
         float D = 0;
         float adj = P + D;
-
+        adj = (-1 * error * error) / 2.7;
         /* 
             The following depends on you. My left motor is always 
             slower than the right when going in reverse. So here I try 
             to apply various corrections 
         */
-        int Lspeed = constrain(adj, -1 * 50, 40);
-        int Rspeed = constrain(adj, -1 * 50, 40);
+        int Lspeed = constrain(adj, -1 * 50, 0);
+        int Rspeed = constrain(adj, -1 * 50, 0);
 
-        if (Lspeed > -1 * 40 && Lspeed < 0)
-        {
-            Lspeed = map(Lspeed, -50, 0, -47, -30);
-        }
-        left_motor.run_motor(Lspeed);
+        // if (Lspeed > -1 * 40 && Lspeed < 0)
+        // {
+        //     Lspeed = map(Lspeed, -50, 0, -47, -30);
+        // }
         right_motor.run_motor(Rspeed);
-        display.println(Lspeed);
-        display.println(Rspeed);
-        display.display();
+        left_motor.run_motor(Lspeed);
     }
 
     error = sonar.ping_cm() - TARGET_DISTANCE;
-    bool complete = false;
 
-    if (abs((int)error) < 3)
-    {
+    if (abs(error) <= 3){
         complete = true;
+        left_motor.run_motor(0);
+        right_motor.run_motor(0);
     }
     return complete;
 }
 
 bool linear_search(short search_radius)
 {
-    // display.clearDisplay();
-    // display.setCursor(0, 0);
-    // display.print("LINE SEARCH");
-    // display.display();
-
     int cm2 = sonar2.ping_cm(); // take distance measurement to see if it is a bin
     int cm = sonar.ping_cm();   // take distance measurement
     // if cm2 is 0, then that means object is outside of detection range

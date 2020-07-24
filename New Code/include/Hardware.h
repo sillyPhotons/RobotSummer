@@ -37,15 +37,13 @@ class Motor
 {
 public:
     Motor(PinName forward_pin, PinName reverse_pin) : forward_pin(forward_pin), reverse_pin(reverse_pin){};
-    /*
-        speed in [-1023, 1023]
-        @params speed
-    */
-    void run_motor(int speed);
+    // speed in [-100, 100]
+    void run_motor(short speed);
 
 private:
     PinName forward_pin = PC_13;
     PinName reverse_pin = PC_13;
+    short current_speed = 0;
 };
 
 static NewPing sonar(TRIG, ECHO, 200);

@@ -183,17 +183,8 @@ bool find_tape()
 
     if (L < SETPOINT && R < SETPOINT)
     {
-        // Serial1.println("TO TAPE");
-        // Serial1.println(L);
-        // Serial1.println(R);
-        // display.clearDisplay();
-        // display.setCursor(0, 0);
-        // display.println("TO TAPE");
-        // display.println(L);
-        // display.println(R);
-        // display.display();
-        left_motor.run_motor(30);
-        right_motor.run_motor(30);
+        left_motor.run_motor(35);
+        right_motor.run_motor(35);
         return false;
     }
 

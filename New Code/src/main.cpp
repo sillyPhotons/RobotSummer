@@ -48,7 +48,7 @@ int time_elapsed = 0;
 unsigned short counter = 1;
 
 void loop()
-{
+{   
     time_elapsed = HAL_GetTick() - start_time;
 
     if (counter % 10 == 0)

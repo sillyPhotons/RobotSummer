@@ -7,7 +7,7 @@
 #include <Bitmap.h>
 
 #define SETPOINT 75
-#define TAPE_TIME 3000
+#define TAPE_TIME 0000
 #define TOTAL_TIME 60000
 #define HOMING_TIME 20000
 #define BACK_UP_TIME 1000
