@@ -2,15 +2,18 @@
 
 void Search::loop()
 {
-    // Serial1.printf("\tSearch state: %d\n", state);
+    // Serial1.printf("Search state: %d\n", state);
     switch (state)
     {
     case 1: // spherical search
         update_state(search(MAX_DISTANCE, direction));
         break;
     case 2: // alignment
-        update_state(align());
+    {
+        bool result = align();
+        update_state(result);
         break;
+    }
     case 3: // pickup cans
         pick_up_can(true);
         delay(300);
@@ -40,7 +43,6 @@ void Search::update_state(bool result)
         else
         {
             search_fail += 1;
-            // Serial1.printf("\t\tFail: %d\n", search_fail);
         }
         if (search_fail > max_search_fail)
         {
@@ -131,13 +133,15 @@ bool new_direction()
 bool align()
 {
     bool complete = false;
-    int cm = sonar.ping_cm(); // take distance measurement
+    int cm = sonar.ping_median(2)/57; // take distance measurement
     int error = cm - TARGET_DISTANCE;
+    // Serial1.printf("\tResult: %d\n", error);
     // move forward
     if (error > 0)
     {
-        left_motor.run_motor(25);
-        right_motor.run_motor(25);
+        // Serial1.printf("\t\tForward\n");
+        left_motor.run_motor(30);
+        right_motor.run_motor(30);
     }
 
     else if (error < 0)
@@ -146,25 +150,14 @@ bool align()
         float D = 0;
         float adj = P + D;
         adj = (-1 * error * error) / 2.7;
-        /* 
-            The following depends on you. My left motor is always 
-            slower than the right when going in reverse. So here I try 
-            to apply various corrections 
-        */
         int Lspeed = constrain(adj, -1 * 50, 0);
         int Rspeed = constrain(adj, -1 * 50, 0);
-
-        // if (Lspeed > -1 * 40 && Lspeed < 0)
-        // {
-        //     Lspeed = map(Lspeed, -50, 0, -47, -30);
-        // }
-
         left_motor.run_motor(Lspeed);
         right_motor.run_motor(Rspeed);
     }
 
-    error = sonar.ping_cm() - TARGET_DISTANCE;
-
+    error = sonar.ping_median(2)/57 - TARGET_DISTANCE;
+    // Serial1.printf("\tResult: %d\n", error);
     if (abs(error) <= 3)
     {
         complete = true;
@@ -224,14 +217,13 @@ bool search(int search_radius, int l_or_r)
     {
         if (l_or_r == 1)
         {
-            run_both(-55, 35, 50);
-            run_both(0, 0, 140);
+            run_both(-55, 35, 55);
         }
         else
         {
-            run_both(55, -35, 50);
-            run_both(0, 0, 140);
+            run_both(55, -35, 55);
         }
+        run_both(0, 0, 95);
         return false;
     }
 }

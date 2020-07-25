@@ -1,29 +1,32 @@
 #include <Hardware.h>
 
 void Motor::run_motor(short speed)
-{
-    if (current_speed != speed)
-    {
+{   
+    Serial1.println(current_speed != speed);
+    // if (current_speed != speed)
+    // {
         current_speed = speed;
-        pwm_stop(reverse_pin);
-        pwm_stop(forward_pin);
         if (speed > 0)
         {
+            pwm_stop(reverse_pin);
             speed = map(speed, 0, 100, 780, 1023);
             pwm_start(forward_pin, PWM_FREQUENCY * 5, speed, RESOLUTION_10B_COMPARE_FORMAT);
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
         }
         else if (speed < 0)
         {
+            pwm_stop(forward_pin);
             speed = map(speed, -100, 0, -1023, -780);
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, speed * -1, RESOLUTION_10B_COMPARE_FORMAT);
             pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
         }
         else {
+            pwm_stop(reverse_pin);
+            pwm_stop(forward_pin);
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
             pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
         }
-    }
+    // }
 }
 
 bool run_both(short left_speed, short right_speed, unsigned int ms)
@@ -114,13 +117,13 @@ void pick_up_can(bool correction)
     }
     delay(600);
 
-    bool mot = run_both(100, 100, 500);
+    bool mot = run_both(100, 100, 550);
     if (!mot)
     {
         return;
     }
     pwm_start(ARM_SERVO, 50, ARM_H_UP, MICROSEC_COMPARE_FORMAT);
-    mot = run_both(50, 50, 300);
+    mot = run_both(50, 50, 400);
     if (!mot)
     {
         pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
