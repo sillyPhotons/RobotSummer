@@ -12,7 +12,7 @@ void Search::loop()
         update_state(align());
         break;
     case 3: // pickup cans
-        pick_up_can(false);
+        pick_up_can(true);
         delay(300);
         update_state(true);
         break;
@@ -136,8 +136,8 @@ bool align()
     // move forward
     if (error > 0)
     {
-        right_motor.run_motor(20);
-        left_motor.run_motor(20);
+        left_motor.run_motor(25);
+        right_motor.run_motor(25);
     }
 
     else if (error < 0)
@@ -158,13 +158,15 @@ bool align()
         // {
         //     Lspeed = map(Lspeed, -50, 0, -47, -30);
         // }
-        right_motor.run_motor(Rspeed);
+
         left_motor.run_motor(Lspeed);
+        right_motor.run_motor(Rspeed);
     }
 
     error = sonar.ping_cm() - TARGET_DISTANCE;
 
-    if (abs(error) <= 3){
+    if (abs(error) <= 3)
+    {
         complete = true;
         left_motor.run_motor(0);
         right_motor.run_motor(0);

@@ -4,6 +4,7 @@ void Motor::run_motor(short speed)
 {
     if (current_speed != speed)
     {
+        current_speed = speed;
         pwm_stop(reverse_pin);
         pwm_stop(forward_pin);
         if (speed > 0)
@@ -12,13 +13,16 @@ void Motor::run_motor(short speed)
             pwm_start(forward_pin, PWM_FREQUENCY * 5, speed, RESOLUTION_10B_COMPARE_FORMAT);
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
         }
-        else
+        else if (speed < 0)
         {
             speed = map(speed, -100, 0, -1023, -780);
             pwm_start(reverse_pin, PWM_FREQUENCY * 5, speed * -1, RESOLUTION_10B_COMPARE_FORMAT);
             pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
         }
-        current_speed = speed;
+        else {
+            pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
+            pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
+        }
     }
 }
 
@@ -106,11 +110,11 @@ void pick_up_can(bool correction)
     pwm_start(ARM_SERVO, 50, ARM_REST, MICROSEC_COMPARE_FORMAT);
     if (correction)
     {
-        run_both(-55, 35, 50);
+        run_both(-55, 35, 20);
     }
     delay(600);
 
-    bool mot = run_both(100, 100, 600);
+    bool mot = run_both(100, 100, 500);
     if (!mot)
     {
         return;
