@@ -23,7 +23,8 @@
 #define BIN_SERVO PA_8
 
 #define ARM_REST 2550
-#define ARM_H_UP 2200
+#define ARM_H_UP1 2200
+#define ARM_H_UP2 1800
 #define ARM_UP 1250
 #define BIN_REST 820
 #define BIN_UP 1900

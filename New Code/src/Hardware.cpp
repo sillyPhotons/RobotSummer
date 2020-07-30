@@ -1,31 +1,32 @@
 #include <Hardware.h>
 
 void Motor::run_motor(short speed)
-{   
-    Serial1.println(current_speed != speed);
+{
+    // Serial1.println(current_speed != speed);
     // if (current_speed != speed)
     // {
-        current_speed = speed;
-        if (speed > 0)
-        {
-            pwm_stop(reverse_pin);
-            speed = map(speed, 0, 100, 780, 1023);
-            pwm_start(forward_pin, PWM_FREQUENCY * 5, speed, RESOLUTION_10B_COMPARE_FORMAT);
-            pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
-        }
-        else if (speed < 0)
-        {
-            pwm_stop(forward_pin);
-            speed = map(speed, -100, 0, -1023, -780);
-            pwm_start(reverse_pin, PWM_FREQUENCY * 5, speed * -1, RESOLUTION_10B_COMPARE_FORMAT);
-            pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
-        }
-        else {
-            pwm_stop(reverse_pin);
-            pwm_stop(forward_pin);
-            pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
-            pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
-        }
+    current_speed = speed;
+    if (speed > 0)
+    {
+        pwm_stop(reverse_pin);
+        speed = map(speed, 0, 100, 780, 1023);
+        pwm_start(forward_pin, PWM_FREQUENCY * 5, speed, RESOLUTION_10B_COMPARE_FORMAT);
+        pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
+    }
+    else if (speed < 0)
+    {
+        pwm_stop(forward_pin);
+        speed = map(speed, -100, 0, -1023, -780);
+        pwm_start(reverse_pin, PWM_FREQUENCY * 5, speed * -1, RESOLUTION_10B_COMPARE_FORMAT);
+        pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
+    }
+    else
+    {
+        pwm_stop(reverse_pin);
+        pwm_stop(forward_pin);
+        pwm_start(reverse_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
+        pwm_start(forward_pin, PWM_FREQUENCY * 5, 0, RESOLUTION_10B_COMPARE_FORMAT);
+    }
     // }
 }
 
@@ -77,15 +78,33 @@ bool run_both(short left_speed, short right_speed, unsigned int ms)
                 }
                 else
                 {
-                    left_motor.run_motor(10);
-                    right_motor.run_motor(10);
+                    left_motor.run_motor(0);
+                    right_motor.run_motor(0);
                     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
                     delay(500);
-                    left_motor.run_motor(80);
-                    right_motor.run_motor(80);
-                    delay(200);
                     // pwm_stop(ARM_SERVO);
-                    away();
+
+                    // take measurement again/,.
+                    L = analogRead(L_SENSOR);
+                    R = analogRead(R_SENSOR);
+
+                    if (L >= SETPOINT || R >= SETPOINT)
+                    {
+                        left_motor.run_motor(55);
+                        right_motor.run_motor(55);
+                        delay(200);
+                        away();
+                    }
+                    else
+                    {
+                        left_motor.run_motor(55);
+                        right_motor.run_motor(55);
+                        while (analogRead(L_SENSOR) < SETPOINT || analogRead(R_SENSOR < SETPOINT))
+                        {
+                        }
+                        delay(200);
+                        away();
+                    }
                     return false;
                 }
             }
@@ -115,15 +134,22 @@ void pick_up_can(bool correction)
     {
         run_both(-55, 35, 20);
     }
-    delay(600);
-
-    bool mot = run_both(100, 100, 550);
+    delay(500);
+    bool mot = run_both(100, 100, 450);
     if (!mot)
     {
         return;
     }
-    pwm_start(ARM_SERVO, 50, ARM_H_UP, MICROSEC_COMPARE_FORMAT);
-    mot = run_both(50, 50, 400);
+    pwm_start(ARM_SERVO, 50, ARM_H_UP1, MICROSEC_COMPARE_FORMAT);
+    mot = run_both(100, 100, 200);
+    if (!mot)
+    {
+        pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+        delay(300);
+        return;
+    }
+    pwm_start(ARM_SERVO, 50, ARM_H_UP2, MICROSEC_COMPARE_FORMAT);
+    mot = run_both(100, 100, 200);
     if (!mot)
     {
         pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
@@ -131,14 +157,12 @@ void pick_up_can(bool correction)
         return;
     }
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
-    mot = run_both(50, 50, 200);
+    mot = run_both(100, 100, 200);
     if (!mot)
     {
-        pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
-        delay(300);
         return;
     }
-    mot = run_both(-80, -80, 200);
+    mot = run_both(-80, -80, 300);
     if (!mot)
     {
         return;

@@ -150,8 +150,8 @@ bool align()
         float D = 0;
         float adj = P + D;
         adj = (-1 * error * error) / 2.7;
-        int Lspeed = constrain(adj, -1 * 50, 0);
-        int Rspeed = constrain(adj, -1 * 50, 0);
+        int Lspeed = constrain(adj, -1 * 40, 0);
+        int Rspeed = constrain(adj, -1 * 40, 0);
         left_motor.run_motor(Lspeed);
         right_motor.run_motor(Rspeed);
     }
