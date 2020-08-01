@@ -25,7 +25,7 @@
 #define ARM_REST 2550
 #define ARM_H_UP1 2200
 #define ARM_H_UP2 1800
-#define ARM_UP 1250
+#define ARM_UP 1165
 #define BIN_REST 820
 #define BIN_UP 1900
 
@@ -41,6 +41,14 @@ public:
     // speed in [-100, 100]
     void run_motor(short speed);
 
+    /**
+     * Returns last nonzero speed
+     */
+    short get_last_speed()
+    {
+        return current_speed;
+    }
+
 private:
     PinName forward_pin = PC_13;
     PinName reverse_pin = PC_13;
@@ -53,8 +61,18 @@ static Adafruit_SSD1306 display(128, 64, &Wire, -1);
 static Motor left_motor = Motor(MOTOR_LF, MOTOR_LB);
 static Motor right_motor = Motor(MOTOR_RF, MOTOR_RB);
 
+extern short L_reading;
+extern short R_reading;
+extern volatile bool crossed;
+extern volatile bool L_crossed;
+extern volatile bool R_crossed;
+
 void dump();
 void away();
+void crossed_tape();
+void check_reflectance();
+void check_crossed_tape();
 void pick_up_can(bool correction);
-bool run_both(short left_speed, short right_speed, unsigned int ms);
+bool run_both(short left_speed, short right_speed, unsigned int ms, bool trigger_away);
+
 #endif

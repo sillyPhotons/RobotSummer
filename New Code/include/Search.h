@@ -5,7 +5,7 @@
 #include <Hardware.h>
 
 #define MAX_DISTANCE 60
-#define TARGET_DISTANCE 29
+#define TARGET_DISTANCE 30
 
 struct Search
 {

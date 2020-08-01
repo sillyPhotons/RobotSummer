@@ -6,11 +6,12 @@
 #include <numeric>
 #include <Bitmap.h>
 
-#define SETPOINT 75
-#define TAPE_TIME 3000
+#define SETPOINT 80
+#define TAPE_TIME 2100
 #define TOTAL_TIME 60000
-#define HOMING_TIME 30000
+#define HOMING_TIME 35000
 #define BACK_UP_TIME 1000
+
 
 enum C_states
 {

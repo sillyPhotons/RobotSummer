@@ -2,7 +2,6 @@
 
 void Search::loop()
 {
-    // Serial1.printf("Search state: %d\n", state);
     switch (state)
     {
     case 1: // spherical search
@@ -20,12 +19,10 @@ void Search::loop()
         update_state(true);
         break;
     case 4: // new direction
-        // Serial1.printf("New Direction\n");
         update_state(new_direction());
         break;
     case 5: // linear search
         update_state(linear_search(MAX_DISTANCE));
-        // Serial1.printf("Linear Search\n");
         break;
     }
 }
@@ -108,13 +105,13 @@ void Search::enter_arena()
     }
     if (cm < TARGET_DISTANCE && cm != 0 && cm2 > cm * 2 && cm2 > 40)
     {
-        left_motor.run_motor(0);
-        right_motor.run_motor(0);
+        left_motor.run_motor(-20);
+        right_motor.run_motor(20);
     }
     else
     {
-        left_motor.run_motor(50);
-        right_motor.run_motor(50);
+        left_motor.run_motor(80);
+        right_motor.run_motor(80);
     }
 }
 
@@ -150,8 +147,8 @@ bool align()
         float D = 0;
         float adj = P + D;
         adj = (-1 * error * error) / 2.7;
-        int Lspeed = constrain(adj, -1 * 40, 0);
-        int Rspeed = constrain(adj, -1 * 40, 0);
+        int Lspeed = constrain(adj, -1 * 40, -10); // changed
+        int Rspeed = constrain(adj, -1 * 40, -10);
         left_motor.run_motor(Lspeed);
         right_motor.run_motor(Rspeed);
     }
@@ -182,8 +179,8 @@ bool linear_search(short search_radius)
     }
     else
     {
-        run_both(50, 50, 120);
-        run_both(0, 0, 80);
+        run_both(50, 50, 120, true);
+        run_both(0, 0, 80, true);
     }
     return false;
 }
@@ -217,13 +214,13 @@ bool search(int search_radius, int l_or_r)
     {
         if (l_or_r == 1)
         {
-            run_both(-55, 35, 55);
+            run_both(-55, 35, 55, true);
         }
         else
         {
-            run_both(55, -35, 55);
+            run_both(55, -35, 55, true);
         }
-        run_both(0, 0, 95);
+        run_both(0, 0, 95, true);
         return false;
     }
 }

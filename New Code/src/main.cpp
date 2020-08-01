@@ -6,10 +6,10 @@
 // Timing variables
 const int start_time = HAL_GetTick();
 bool competition_mode = true;
+
 void setup()
 {
     Serial1.begin(115200);
-
     delay(100);
     pinMode(LED_DISPLAY, INPUT_PULLUP);
     display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -49,6 +49,17 @@ void setup()
         delay(500);
         pwm_stop(ARM_SERVO);
     }
+
+#if defined(TIM1)
+    TIM_TypeDef *Instance = TIM1;
+#else
+    TIM_TypeDef *Instance = TIM2;
+#endif
+    HardwareTimer *MyTim = new HardwareTimer(Instance);
+
+    MyTim->setOverflow(120, HERTZ_FORMAT); // 10 Hz
+    MyTim->attachInterrupt(check_crossed_tape);
+    MyTim->resume();
 }
 
 short state = entering;
@@ -60,6 +71,7 @@ unsigned short counter = 1;
 void loop()
 {
     time_elapsed = HAL_GetTick() - start_time;
+
     switch (competition_mode)
     {
     case true:
@@ -90,10 +102,21 @@ void loop()
         {
         case entering:
             Search_Manager.enter_arena();
+            crossed = false;
+            L_crossed = false;
+            R_crossed = false;
             break;
 
         case searching:
+            if (crossed)
+            {
+                crossed_tape();
+            }
             Search_Manager.loop();
+            if (crossed)
+            {
+                crossed_tape();
+            }
             break;
 
         case homing:
@@ -105,11 +128,11 @@ void loop()
     }
     case false:
     {
-        if (time_elapsed < TAPE_TIME/3)
+        if (time_elapsed < TAPE_TIME / 3)
         {
             state = spin;
         }
-        else if (time_elapsed > TAPE_TIME/3 && state != complete)
+        else if (time_elapsed > TAPE_TIME / 3 && state != complete)
         {
             state = retrieve;
         }
@@ -117,22 +140,22 @@ void loop()
         switch (state)
         {
         case spin:
-            run_both(-55, 35, 55);
-            run_both(0, 0, 95);
+            run_both(-55, 35, 55, false);
+            run_both(0, 0, 95, false);
             break;
 
         case retrieve:
-            run_both(100, 100, 550);
+            run_both(100, 100, 550, false);
             pwm_start(ARM_SERVO, 50, ARM_H_UP1, MICROSEC_COMPARE_FORMAT);
-            run_both(50, 50, 300);
-            run_both(30, 30, 200);
-            run_both(20, 20, 100);
+            run_both(50, 50, 300, false);
+            run_both(30, 30, 200, false);
+            run_both(20, 20, 100, false);
             pwm_start(ARM_SERVO, 50, ARM_H_UP1 - 500, MICROSEC_COMPARE_FORMAT);
             state = complete;
             break;
 
         case complete:
-            run_both(0, 0, 50);
+            run_both(0, 0, 50, false);
             break;
         }
         break;

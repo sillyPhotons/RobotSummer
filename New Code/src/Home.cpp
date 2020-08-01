@@ -8,7 +8,6 @@ short Lspeed = 30,
 
 void Home::loop()
 {
-    Serial1.printf("\tHoming state: %d\n", state);
     switch (state)
     {
     case 1: // looking for tape
@@ -38,6 +37,9 @@ void Home::loop()
 
     case 4: // dumping
     {
+        crossed = false;
+        L_crossed = false;
+        R_crossed = false;
         dump();
         left_motor.run_motor(0);
         right_motor.run_motor(0);
@@ -93,8 +95,8 @@ void Home::update_state(bool result)
 */
 bool checkLine()
 {
-    short L = analogRead(L_SENSOR);
-    short R = analogRead(R_SENSOR);
+    short L = L_reading;
+    short R = R_reading;
 
     if (L > SETPOINT)
     {
@@ -169,19 +171,14 @@ void PID(float L, float R)
             error = (prevError / abs(prevError)) * 5;
         }
     }
-
     prevError = error;
-
     right_motor.run_motor(Rspeed);
     left_motor.run_motor(Lspeed);
 }
 
 bool find_tape()
 {
-    short L = analogRead(L_SENSOR),
-          R = analogRead(R_SENSOR);
-
-    if (L < SETPOINT && R < SETPOINT)
+    if (L_reading < SETPOINT && R_reading < SETPOINT)
     {
         left_motor.run_motor(35);
         right_motor.run_motor(35);
@@ -192,25 +189,23 @@ bool find_tape()
     {
         while (true)
         {
-            L = analogRead(L_SENSOR);
-            R = analogRead(R_SENSOR);
-            if (L >= SETPOINT)
+            if (L_reading >= SETPOINT)
             {
-                if (R < SETPOINT)
+                if (R_reading < SETPOINT)
                 {
                     break;
                 }
             }
-            else if (R >= SETPOINT)
+            else if (R_reading >= SETPOINT)
             {
-                if (L < SETPOINT)
+                if (L_reading < SETPOINT)
                 {
                     break;
                 }
             }
-            run_both(0, 0, 75);
-            run_both(-55, 35, 50);
-            run_both(0, 0, 75);
+            run_both(0, 0, 75, false);
+            run_both(-55, 35, 50, false);
+            run_both(0, 0, 75, false);
         }
         left_motor.run_motor(0);
         right_motor.run_motor(0);
