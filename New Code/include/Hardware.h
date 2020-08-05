@@ -61,6 +61,9 @@ static Adafruit_SSD1306 display(128, 64, &Wire, -1);
 static Motor left_motor = Motor(MOTOR_LF, MOTOR_LB);
 static Motor right_motor = Motor(MOTOR_RF, MOTOR_RB);
 
+static HardwareTimer MyTim = HardwareTimer(TIM1);
+
+
 extern short L_reading;
 extern short R_reading;
 extern volatile bool crossed;

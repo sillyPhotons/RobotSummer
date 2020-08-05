@@ -95,6 +95,8 @@ void Home::update_state(bool result)
 */
 bool checkLine()
 {
+    check_crossed_tape();
+
     short L = L_reading;
     short R = R_reading;
 
@@ -178,6 +180,7 @@ void PID(float L, float R)
 
 bool find_tape()
 {
+    check_crossed_tape();
     if (L_reading < SETPOINT && R_reading < SETPOINT)
     {
         left_motor.run_motor(35);

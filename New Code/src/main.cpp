@@ -50,13 +50,6 @@ void setup()
         pwm_stop(ARM_SERVO);
     }
 
-#if defined(TIM1)
-    TIM_TypeDef *Instance = TIM1;
-#else
-    TIM_TypeDef *Instance = TIM2;
-#endif
-    HardwareTimer *MyTim = new HardwareTimer(Instance);
-
     MyTim->setOverflow(120, HERTZ_FORMAT); // 10 Hz
     MyTim->attachInterrupt(check_crossed_tape);
     MyTim->resume();
@@ -95,6 +88,7 @@ void loop()
         }
         else
         {
+            MyTim->pause();
             state = homing;
         }
 
