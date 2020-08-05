@@ -1,0 +1,139 @@
+#include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_SSD1306.h>
+#include <Servo.h>
+#include "main.h"
+void run2_motors(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int time);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Motor left_motor = Motor(MOTOR_LF, MOTOR_LB);
+Motor right_motor = Motor(MOTOR_RF, MOTOR_RB);
+
+void setup() {
+  //OLED display setup
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    display.display();
+    delay(1);
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0,0);
+    display.display();
+
+    //sensors & actuators setup
+    pinMode(MOTOR_RF, OUTPUT); //right motor
+    pinMode(MOTOR_RB, OUTPUT); //right motor
+    pinMode(MOTOR_LF, OUTPUT); //left motor
+    pinMode(MOTOR_RB, OUTPUT); //left motor
+
+    pwm_start(BUCKET, 50, BUCKET_DOWN, MICROSEC_COMPARE_FORMAT);
+    delay(200);
+    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_stop(ARM_SERVO);
+    pwm_stop(BUCKET);
+}
+
+bool run = true;
+void loop() {
+  while (run) {
+    delay(500);
+    //step clap x 3, robot starts going left
+    run2_motors(&left_motor,&right_motor,-50,50,200);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+    pwm_start(ARM_SERVO, 50, ARM_DOWN, MICROSEC_COMPARE_FORMAT);
+    run2_motors(&left_motor,&right_motor,25,25,700);
+    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(300);
+    pwm_stop(ARM_SERVO);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+
+    run2_motors(&left_motor,&right_motor,50,-50,500);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+    pwm_start(ARM_SERVO, 50, ARM_DOWN, MICROSEC_COMPARE_FORMAT);
+    run2_motors(&left_motor,&right_motor,25,25,700);
+    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(300);
+    pwm_stop(ARM_SERVO);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+
+    run2_motors(&left_motor,&right_motor,-50,50,500);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+    pwm_start(ARM_SERVO, 50, ARM_DOWN, MICROSEC_COMPARE_FORMAT);
+    run2_motors(&left_motor,&right_motor,25,25,700);
+    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(300);
+    pwm_stop(ARM_SERVO);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+
+    //turn to face me LOL
+    run2_motors(&left_motor,&right_motor,50,-50,900);
+
+    //turn and point x 3, robot turns left
+    run2_motors(&left_motor, &right_motor, -50, 50, 150);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+
+    run2_motors(&left_motor, &right_motor, -50, 50, 150);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+    pwm_start(ARM_SERVO, 50, ARM_DOWN, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_stop(ARM_SERVO);
+
+    run2_motors(&left_motor, &right_motor, -50, 50, 150);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+    pwm_start(ARM_SERVO, 50, ARM_DOWN, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_stop(ARM_SERVO);
+
+    run2_motors(&left_motor, &right_motor, -50, 50, 150);
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+    pwm_start(ARM_SERVO, 50, ARM_DOWN, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_stop(ARM_SERVO);
+
+    //back up with arm down
+    run2_motors(&left_motor, &right_motor, -30,-30, 2000);
+
+    //spin
+    run2_motors(&left_motor, &right_motor, 70,-70, 2200);
+    //stop, arm down bucket up
+    left_motor.run_motor(0);
+    right_motor.run_motor(0);
+    delay(100);
+    pwm_start(ARM_SERVO, 50, ARM_DOWN, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+    pwm_start(BUCKET, 50, BUCKET_UP, MICROSEC_COMPARE_FORMAT);
+    delay(500);
+  } 
+}
+
+/**
+ * Runs two motors simultaneously at a given speed for a given amount of time
+ * @param motor1: motor object
+ * @param motor2: motor object
+ * @param speed1: speed of motor1 [-100,100]
+ * @param speed2: speed of motor2 [-100,100]
+ * @param time: time that motors run in ms
+ */
+void run2_motors(Motor *motor1, Motor *motor2, int speed1, int speed2, unsigned int time) {
+    unsigned int initial_t = HAL_GetTick();
+    motor1 -> run_motor(speed1);
+    motor2 -> run_motor(speed2);
+    while (HAL_GetTick() - initial_t < time) {
+    }
+}
