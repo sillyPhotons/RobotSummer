@@ -4,8 +4,7 @@
 #include <Home.h>
 
 // Timing variables
-const int start_time = HAL_GetTick();
-bool competition_mode = true;
+short competition_mode = 1;
 
 void setup()
 {
@@ -38,27 +37,21 @@ void setup()
     int mode = analogRead(PGAIN);
     if (mode > 500)
     {
-        competition_mode = false;
+        competition_mode = 0;
         pwm_start(ARM_SERVO, 50, ARM_REST, MICROSEC_COMPARE_FORMAT);
         delay(500);
     }
     else
     {
+        competition_mode = 1;
         pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
         delay(500);
         pwm_stop(ARM_SERVO);
     }
-
-#if defined(TIM1)
-    TIM_TypeDef *Instance = TIM1;
-#else
-    TIM_TypeDef *Instance = TIM2;
-#endif
-    HardwareTimer *MyTim = new HardwareTimer(Instance);
-    // check_crossed_tape will be called 70 times every second
-    MyTim->setOverflow(70, HERTZ_FORMAT);
-    MyTim->attachInterrupt(check_sensors);
-    MyTim->resume();
+    // check_crossed_tape will be called 100 times every second
+    MyTim.setOverflow(100, HERTZ_FORMAT);
+    MyTim.attachInterrupt(check_sensors);
+    MyTim.resume();
 }
 
 short state = entering;
@@ -66,102 +59,100 @@ short state = entering;
 // 4 second delay before recognizing both sensor high as end point
 Home Home_Manager = Home(1000);
 
-Search Search_Manager = Search(12, 5, 8);
+Search Search_Manager = Search(12, 5, 7);
 int time_elapsed = 0;
 unsigned short counter = 1;
 
 bool found = false;
 void loop()
 {
+    time_elapsed = HAL_GetTick() - start_time;
+    switch (competition_mode)
+    {
+    case 1:
+    {
+        if (counter % 10 == 0)
+        {
+            display.clearDisplay();
+            display.setCursor(0, 0);
+            display.print(time_elapsed / 1000.0);
+            display.display();
+            counter = 1;
+        }
 
-    // time_elapsed = HAL_GetTick() - start_time;
+        if (time_elapsed < TAPE_TIME && !found)
+        {
+            state = entering;
+        }
+        else if (time_elapsed < TOTAL_TIME - TAPE_TIME - HOMING_TIME)
+        {
+            state = searching;
+        }
+        else {
+            MyTim.detachInterrupt();
+            state = homing;
+        }
 
-    // switch (competition_mode)
-    // {
-    // case true:
-    // {
-    //     if (counter % 10 == 0)
-    //     {
-    //         display.clearDisplay();
-    //         display.setCursor(0, 0);
-    //         display.print(time_elapsed / 1000.0);
-    //         display.display();
-    //         counter = 1;
-    //     }
+        switch (state)
+        {
+        case entering:
+            found = Search_Manager.enter_arena();
+            crossed = false;
+            break;
 
-    //     if (time_elapsed < TAPE_TIME && !found)
-    //     {
-    //         state = entering;
-    //     }
-    //     else if (time_elapsed < TOTAL_TIME - TAPE_TIME - HOMING_TIME)
-    //     {
-    //         state = searching;
-    //     }
-    //     else
-    //     {
-    //         state = homing;
-    //     }
+        case searching:
+            if (crossed)
+            {
+                crossed_tape();
+            }
+            Search_Manager.loop();
+            if (crossed)
+            {
+                crossed_tape();
+            }
+            break;
 
-    //     switch (state)
-    //     {
-    //     case entering:
-    //         found = Search_Manager.enter_arena();
-    //         crossed = false;
-    //         break;
+        case homing:
+            Home_Manager.loop();
+            break;
+        }
+        counter += 1;
+        break;
+    }
+    case 0:
+    {
+        if (time_elapsed < TAPE_TIME / 3)
+        {
+            state = spin;
+        }
+        else if (time_elapsed > TAPE_TIME / 3 && state != complete)
+        {
+            state = retrieve;
+        }
 
-    //     case searching:
-    //         if (crossed)
-    //         {
-    //             crossed_tape();
-    //         }
-    //         Search_Manager.loop();
-    //         if (crossed)
-    //         {
-    //             crossed_tape();
-    //         }
-    //         break;
+        switch (state)
+        {
+        case spin:
+            run_both(-55, 35, 55, false);
+            run_both(0, 0, 95, false);
+            break;
 
-    //     case homing:
-    //         Home_Manager.loop();
-    //         break;
-    //     }
-    //     counter += 1;
-    //     break;
-    // }
-    // case false:
-    // {
-    //     if (time_elapsed < TAPE_TIME / 3)
-    //     {
-    //         state = spin;
-    //     }
-    //     else if (time_elapsed > TAPE_TIME / 3 && state != complete)
-    //     {
-    //         state = retrieve;
-    //     }
+        case retrieve:
+            run_both(100, 100, 550, false);
+            pwm_start(ARM_SERVO, 50, ARM_H_UP1, MICROSEC_COMPARE_FORMAT);
+            run_both(100, 100, 200, false);
+            pwm_start(ARM_SERVO, 50, ARM_H_UP1 - 500, MICROSEC_COMPARE_FORMAT);
+            run_both(100, 100, 200, false);
+            run_both(30, 30, 200, false);
 
-    //     switch (state)
-    //     {
-    //     case spin:
-    //         run_both(-55, 35, 55, false);
-    //         run_both(0, 0, 95, false);
-    //         break;
+            state = complete;
+            break;
 
-    //     case retrieve:
-    //         run_both(100, 100, 550, false);
-    //         pwm_start(ARM_SERVO, 50, ARM_H_UP1, MICROSEC_COMPARE_FORMAT);
-    //         run_both(100, 100, 200, false);
-    //         pwm_start(ARM_SERVO, 50, ARM_H_UP1 - 500, MICROSEC_COMPARE_FORMAT);
-    //         run_both(100, 100, 200, false);
-    //         run_both(30, 30, 200, false);
-            
-    //         state = complete;
-    //         break;
-
-    //     case complete:
-    //         run_both(0, 0, 50, false);
-    //         break;
-    //     }
-    //     break;
-    // }
-    // }
+        case complete:
+            run_both(0, 0, 50, false);
+            break;
+        }
+        break;
+    }
+    }
 };

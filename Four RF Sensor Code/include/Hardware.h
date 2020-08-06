@@ -38,7 +38,7 @@
 class Motor
 {
 public:
-    Motor(PinName forward_pin, PinName reverse_pin) : forward_pin(forward_pin), reverse_pin(reverse_pin){};
+    Motor(PinName forward_pin, PinName reverse_pin) : forward_pin(forward_pin), reverse_pin(reverse_pin) {};
     // speed in [-100, 100]
     void run_motor(short speed);
 
@@ -61,10 +61,14 @@ static NewPing sonar2(TRIG2, ECHO2, 200);
 static Adafruit_SSD1306 display(128, 64, &Wire, -1);
 static Motor left_motor = Motor(MOTOR_LF, MOTOR_LB);
 static Motor right_motor = Motor(MOTOR_RF, MOTOR_RB);
+static HardwareTimer MyTim = HardwareTimer(TIM1);
+// extern bool dumped;
+extern int start_time;
+// extern int stored_cans;
 
 extern volatile bool crossed;
 extern volatile bool readings[4];
-extern volatile short test[4];
+
 
 void dump();
 void away();

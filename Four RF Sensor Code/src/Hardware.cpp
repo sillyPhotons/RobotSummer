@@ -1,10 +1,10 @@
 #include <Hardware.h>
 
-// volatile bool readings[4] = {false};
+bool dumped = false;
+int start_time = HAL_GetTick();
+int stored_cans = 0;
+volatile bool readings[4] = {false};
 volatile bool crossed = false;
-// volatile short test[4] = {0};
-volatile float error = 0;
-volatile float prev_error = 0;
 void Motor::run_motor(short speed)
 {
     if (speed != 0)
@@ -69,6 +69,10 @@ bool run_both(short left_speed, short right_speed, unsigned int ms, bool trigger
  * */
 short get_line_following_state()
 {
+    readings[L] = analogRead(L_SENSOR) >= SETPOINT;
+    readings[R] = analogRead(R_SENSOR) >= SETPOINT;
+    readings[L2] = analogRead(L_SENSOR2) >= SETPOINT;
+    readings[R2] = analogRead(R_SENSOR2) >= SETPOINT;
 
     bool L_2 = readings[L2],
          L_ = readings[L],
@@ -168,6 +172,11 @@ short get_orientation()
 
 short check_tape()
 {
+    readings[L] = analogRead(L_SENSOR) >= SETPOINT;
+    readings[R] = analogRead(R_SENSOR) >= SETPOINT;
+    readings[L2] = analogRead(L_SENSOR2) >= SETPOINT;
+    readings[R2] = analogRead(R_SENSOR2) >= SETPOINT;
+
     short count = 0;
     for (int i = 0; i < 4; i += 1)
     {
@@ -181,21 +190,13 @@ short check_tape()
 
 void check_sensors()
 {
-    test[L] = map(constrain(analogRead(L_SENSOR), 50, 250), 50, 250, 0, 1000);
-    test[R] = map(constrain(analogRead(R_SENSOR), 50, 250), 50, 250, 0, 1000);
-    test[L2] = map(constrain(analogRead(L_SENSOR2), 50, 250), 50, 250, 0, 1000);
-    test[R2] = map(constrain(analogRead(R_SENSOR2), 50, 250), 50, 250, 0, 1000);
-    float error = (1000.0 * 1.0 * test[L] + 1000.0 * 2.0 * test[R] + 1000.0 * 3.0 * test[R2]) / (float)(test[L2] + test[L] + test[R] + test[R2]) - 1500;
+    readings[L] = analogRead(L_SENSOR) >= SETPOINT;
+    readings[R] = analogRead(R_SENSOR) >= SETPOINT;
 
-    // readings[L] = analogRead(L_SENSOR) >= SETPOINT;
-    // readings[R] = analogRead(R_SENSOR) >= SETPOINT;
-    // readings[L2] = analogRead(L_SENSOR2) >= SETPOINT;
-    // readings[R2] = analogRead(R_SENSOR2) >= SETPOINT;
-
-    // if ((readings[L] || readings[L2] || readings[R] || readings[R2]) && !crossed)
-    // {
-    //     crossed = true;
-    // }
+    if ((readings[L] || readings[R]) && !crossed)
+    {
+        crossed = true;
+    }
 }
 
 void crossed_tape()
@@ -239,12 +240,12 @@ void crossed_tape()
 }
 void away()
 {
-    bool mot = run_both(-40, 35, rand() % 900, true);
+    bool mot = run_both(-40, 35, map(rand()%100, 0, 100, 900, 1500), true);
     if (!mot)
     {
         return;
     }
-    run_both(40, 40, 700, true);
+    run_both(40, 40, 350, true);
 }
 
 void pick_up_can(bool correction)
@@ -255,13 +256,13 @@ void pick_up_can(bool correction)
         run_both(-55, 35, 20, true);
     }
     delay(500);
-    bool mot = run_both(100, 100, 450, true);
+    bool mot = run_both(90, 90, 400, true);
     if (!mot)
     {
         return;
     }
     pwm_start(ARM_SERVO, 50, ARM_H_UP1, MICROSEC_COMPARE_FORMAT);
-    mot = run_both(100, 100, 200, true);
+    mot = run_both(80, 80, 200, true);
     if (!mot)
     {
         pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
@@ -269,7 +270,7 @@ void pick_up_can(bool correction)
         return;
     }
     pwm_start(ARM_SERVO, 50, ARM_H_UP2, MICROSEC_COMPARE_FORMAT);
-    mot = run_both(100, 100, 200, true);
+    mot = run_both(80, 80, 200, true);
     if (!mot)
     {
         pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
@@ -277,32 +278,19 @@ void pick_up_can(bool correction)
         return;
     }
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
-    // mot = run_both(55, -55, 50, true);
-    // if (!mot)
-    // {
-    //     return;
-    // }
-    // mot = run_both(-55, 55, 50, true);
-    // if (!mot)
-    // {
-    //     return;
-    // }
-    mot = run_both(100, 100, 100, true);
-    if (!mot)
-    {
-        return;
-    }
-    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
-    delay(100);
+    delay(250);
+    mot = run_both(80, 80, 50, true);
     pwm_start(ARM_SERVO, 50, 1300, MICROSEC_COMPARE_FORMAT);
-    delay(200);
-    pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
-    mot = run_both(-80, -80, 300, true);
-    if (!mot)
-    {
-        return;
-    }
-    run_both(-100, -100, 300, true);
+    mot = run_both(80, 80, 50, true);
+    delay(100);
+    // pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
+    // mot = run_both(-80, -80, 300, true);
+    // if (!mot)
+    // {
+    //     return;
+    // }
+    // run_both(-100, -100, 300, true);
+    stored_cans += 1;
 }
 
 /**
@@ -320,7 +308,7 @@ void dump()
     run_both(0, 0, 10, false);
     t = HAL_GetTick();
     pwm_start(BIN_SERVO, 50, BIN_UP, MICROSEC_COMPARE_FORMAT);
-    while (HAL_GetTick() - t < 3000)
+    while (HAL_GetTick() - t < 2000)
     {
     }
 
@@ -328,12 +316,9 @@ void dump()
     t = HAL_GetTick();
 
     pwm_start(BIN_SERVO, 50, BIN_REST, MICROSEC_COMPARE_FORMAT);
-    while (HAL_GetTick() - t < 3000)
+    while (HAL_GetTick() - t < 2000)
     {
     }
-
-    // delay(3000);
-    // pwm_stop(BIN_SERVO);
     pwm_start(ARM_SERVO, 50, ARM_UP, MICROSEC_COMPARE_FORMAT);
     delay(500);
     pwm_stop(ARM_SERVO);

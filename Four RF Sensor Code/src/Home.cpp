@@ -1,20 +1,18 @@
 #include <Home.h>
 
-short LINE_FOLLOW_SPEED = 50;
-
-short three_on_tape_counter = 0;
-short max_three_counter = 20;
+short LINE_FOLLOW_SPEED = 40;
+int three_on_tape_time = 0;
+short integeral_counter = 0;
+short max_3_on_tape_time = 1000;
 float error = 0,
-      prevError = 0,
-      prev_I = 0,
-      Kp = 4,
-      Ki = 0,
-      Kd = 0,
-      P = 0,
-      I = 0,
-      D = 0;
-
-bool seen_tape = false;
+prevError = 0,
+prev_I[10] ={ 0 },
+Kp = 0.23,
+Ki = 0.0,
+Kd = 0.5,
+P = 0,
+I = 0,
+D = 0;
 
 void Home::loop()
 {
@@ -56,6 +54,7 @@ void Home::loop()
     }
 
     case 5: // complete
+        // dumped = true;
         update_state(true);
         break;
     }
@@ -77,6 +76,10 @@ void Home::update_state(bool result)
         {
             state = 3;
         }
+        else if (reversed == 1 && result == false) {
+            reversed = 2;
+            state = 1;
+        }
         else
         {
             state = 2;
@@ -97,39 +100,53 @@ void Home::update_state(bool result)
 
 float PID()
 {
-    P = error;
-    I = error*(1./70.) + prev_I;
-    D = (error - prevError)/(1./70);
+    short E = error;
+
+    prev_I[integeral_counter] = E;
+    if (integeral_counter < 10)
+    {
+        integeral_counter += 1;
+    }
+    else
+    {
+        integeral_counter = 0;
+    }
+
+    P = E;
+    I = 0;
+    for (int i = 0; i < 10; i += 1)
+    {
+        I += prev_I[i];
+    }
+    D = error - prevError;
 
     float adj = Kp * P + Ki * I + Kd * D;
 
-    prev_I = I;
     prevError = error;
-
     return adj;
 }
 
 bool line_follow()
 {
     short line_following_state = get_line_following_state();
+    // Serial1.printf("%d\n",line_following_state);
     switch (line_following_state)
     {
     case 0:
         if (prevError > 0)
         {
-            error = 9;
+            error = 5;
             right_motor.run_motor(35);
             left_motor.run_motor(-35);
         }
         else if (prevError < 0)
         {
-            error = -9;
+            error = -5;
             right_motor.run_motor(-35);
             left_motor.run_motor(35);
         }
-        // prev_I = I;
-        // prevError = error;
-        // return false;
+        prevError = error;
+        return false;
         break;
     case 1:
         error = -4;
@@ -145,26 +162,24 @@ bool line_follow()
         break;
     case 3:
         error = 0;
-        three_on_tape_counter += 1;
-        if (three_on_tape_counter == max_three_counter)
-        {
+        if (three_on_tape_time == 0) {
+            three_on_tape_time = HAL_GetTick();
+        }
+        else if (HAL_GetTick() - three_on_tape_time > max_3_on_tape_time && reversed == 0) {
             reverse();
         }
-        // left_motor.run_motor(LINE_FOLLOW_SPEED);
-        // right_motor.run_motor(LINE_FOLLOW_SPEED);
         break;
     case 4:
         delay(100);
         return true;
     case 5:
         error = 0;
-        three_on_tape_counter += 1;
-        if (three_on_tape_counter == max_three_counter)
-        {
+        if (three_on_tape_time == 0) {
+            three_on_tape_time = HAL_GetTick();
+        }
+        else if (HAL_GetTick() - three_on_tape_time > max_3_on_tape_time && reversed == 0) {
             reverse();
         }
-        // left_motor.run_motor(LINE_FOLLOW_SPEED);
-        // right_motor.run_motor(LINE_FOLLOW_SPEED);
         break;
     case 6:
         error = 3;
@@ -204,32 +219,29 @@ bool line_follow()
     left_motor.run_motor(left_motor_speed);
     right_motor.run_motor(right_motor_speed);
     // Serial1.printf("%d %d\n", right_motor_speed, left_motor_speed);
+
     return false;
 }
 
+/**
+ * true for left, false for right
+ * */
 bool find_tape()
 
 {
-    if (check_tape() == 0 && !seen_tape)
+    if (check_tape() == 0)
     {
         left_motor.run_motor(45);
         right_motor.run_motor(45);
         return false;
     }
-    else if (check_tape() == 0 && seen_tape)
-    {
-        run_both(-50, -50, 200, false);
-        run_both(-55, 35, 55, false);
-        seen_tape = false;
-        return false;
-    }
 
     else
     {
-        seen_tape = true;
         while (true)
         {
             int orientation = get_orientation();
+
             switch (orientation)
             {
             case 1: // robot facing +x
@@ -245,16 +257,16 @@ bool find_tape()
                 }
                 return true;
             case 2:
-                run_both(-50, -50, 200, false);
-                run_both(-55, 35, 55, false);
+                run_both(-50, -50, 500, false);
+                run_both(-55, 35, 100, false);
                 return false;
             case 3:
-                run_both(-50, -50, 200, false);
-                run_both(-55, 35, 55, false);
+                run_both(-50, -50, 500, false);
+                run_both(-55, 35, 100, false);
                 return false;
             case 4: // robot orientation is indeterminate
-                run_both(-50, -50, 200, false);
-                run_both(-55, 35, 55, false);
+                run_both(-50, -50, 500, false);
+                run_both(-55, 35, 100, false);
                 return false;
             }
         }
@@ -263,14 +275,6 @@ bool find_tape()
 
 void reverse()
 {
-    right_motor.run_motor(45);
-    left_motor.run_motor(-45);
-    while (get_line_following_state() != 0)
-    {
-    }
-    right_motor.run_motor(45);
-    left_motor.run_motor(-45);
-    while (get_line_following_state() == 0)
-    {
-    }
+    run_both(-40, 40, 300, false);
+    reversed = 1;
 }

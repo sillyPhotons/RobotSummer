@@ -6,11 +6,10 @@
 #include <numeric>
 #include <Bitmap.h>
 
-#define SETPOINT 60
-#define TEST_SETPOINT 250
-#define TAPE_TIME 2500
+#define SETPOINT 70
+#define TAPE_TIME 2300
 #define TOTAL_TIME 60000
-#define HOMING_TIME 60000
+#define HOMING_TIME 30000
 #define BACK_UP_TIME 1000
 
 

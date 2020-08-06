@@ -231,13 +231,13 @@ bool search(int search_radius, int l_or_r)
     {
         if (l_or_r == 1)
         {
-            run_both(-55, 35, 55, true);
+            run_both(-55, 35, 50, true);
         }
         else
         {
-            run_both(55, -35, 55, true);
+            run_both(55, -35, 50, true);
         }
-        run_both(0, 0, 50, true);
+        run_both(0, 0, 55, true);
         return false;
     }
 }

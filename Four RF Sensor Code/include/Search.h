@@ -15,13 +15,13 @@ struct Search
     };
     void loop();
     bool enter_arena();
-
+    int state = 1;
+    
 private:
     int max_search_fail = 0;
     int max_align_fail = 0;
     int search_fail = 0;
     int align_fail = 0;
-    int state = 1;
     int max_linear_search_fail = 0;
     int linear_search_counter = 0;
     int direction = 1; // 1 is right -1 is left
